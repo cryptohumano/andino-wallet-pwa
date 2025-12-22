@@ -57,9 +57,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'PWA Substrate Explorer',
-        short_name: 'Substrate PWA',
-        description: 'Explorador de capacidades de Dedot y Polkadot SDK',
+        name: 'Aura Wallet',
+        short_name: 'Aura Wallet',
+        description: 'Wallet criptográfica segura y privada para redes Substrate/Polkadot con WebAuthn, multi-cadena y gestión de identidad',
         theme_color: '#6366f1',
         background_color: '#ffffff',
         display: 'standalone',
@@ -92,17 +92,31 @@ export default defineConfig({
         screenshots: [],
         shortcuts: [
           {
-            name: 'Explorar Cadenas',
-            short_name: 'Cadenas',
-            description: 'Explorar información de cadenas',
-            url: '/#chains',
+            name: 'Inicio',
+            short_name: 'Inicio',
+            description: 'Ver resumen de cuentas y balances',
+            url: '/',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           },
           {
-            name: 'Gestión de Cuentas',
+            name: 'Enviar',
+            short_name: 'Enviar',
+            description: 'Enviar tokens a otra dirección',
+            url: '/send',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
+          },
+          {
+            name: 'Cuentas',
             short_name: 'Cuentas',
-            description: 'Gestionar cuentas del keyring',
-            url: '/#accounts',
+            description: 'Gestionar cuentas del wallet',
+            url: '/accounts',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
+          },
+          {
+            name: 'Identidad',
+            short_name: 'Identidad',
+            description: 'Gestionar identidad y privacidad',
+            url: '/identity',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           }
         ]
