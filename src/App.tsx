@@ -6,6 +6,7 @@ import { BlockExplorer } from '@/components/BlockExplorer'
 import { AccountInfo } from '@/components/AccountInfo'
 import { KeyringManager } from '@/components/KeyringManager'
 import { KeyringUnlock } from '@/components/KeyringUnlock'
+import { WebAuthnManager } from '@/components/WebAuthnManager'
 import { SignVerify } from '@/components/SignVerify'
 import { EncryptDecrypt } from '@/components/EncryptDecrypt'
 import { EthereumDerivation } from '@/components/EthereumDerivation'
@@ -138,6 +139,7 @@ function App() {
             </div>
 
             <KeyringUnlock />
+            <WebAuthnManager />
             <KeyringManager />
             {client && <Transactions client={client} />}
             <SignVerify />

@@ -113,6 +113,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/_/, /\/[^/?]+\.[^/]+$/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*/,
@@ -132,12 +134,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      'buffer': 'buffer',
     },
   },
   define: {
     'process.env': {},
     'global': 'globalThis',
+    'process.browser': true,
   },
   optimizeDeps: {
     esbuildOptions: {

@@ -5,14 +5,20 @@ globalThis.Buffer = Buffer
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { RouterProvider } from 'react-router-dom'
 import './index.css'
-import App from './App.tsx'
+import { router } from './router'
 import { KeyringProvider } from './contexts/KeyringContext'
+import { NetworkProvider } from './contexts/NetworkContext'
+import { Toaster } from '@/components/ui/sonner'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <KeyringProvider>
-      <App />
+      <NetworkProvider>
+        <RouterProvider router={router} />
+        <Toaster />
+      </NetworkProvider>
     </KeyringProvider>
   </StrictMode>,
 )

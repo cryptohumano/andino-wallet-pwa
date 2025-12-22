@@ -117,3 +117,33 @@ export async function verifyPassword(encryptedHex: string, password: string): Pr
   }
 }
 
+/**
+ * Desencripta datos usando una CryptoKey directamente (para WebAuthn)
+ */
+export async function decryptWithKey(encryptedHex: string, key: CryptoKey): Promise<string> {
+  const { hexToU8a } = await import('@polkadot/util')
+  const combined = hexToU8a(encryptedHex)
+  
+  const SALT_LENGTH = 32
+  const IV_LENGTH = 12
+  
+  const salt = combined.slice(0, SALT_LENGTH)
+  const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH)
+  const encrypted = combined.slice(SALT_LENGTH + IV_LENGTH)
+  
+  try {
+    const decrypted = await crypto.subtle.decrypt(
+      {
+        name: ALGORITHM,
+        iv: iv,
+      },
+      key,
+      encrypted
+    )
+    
+    return new TextDecoder().decode(decrypted)
+  } catch (error) {
+    throw new Error('Error al desencriptar con clave: ' + (error instanceof Error ? error.message : String(error)))
+  }
+}
+

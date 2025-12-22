@@ -11,8 +11,9 @@
  */
 
 const DB_NAME = 'pwa-substrate-keyring'
-const DB_VERSION = 2 // Incrementado para agregar índices
+const DB_VERSION = 4 // Actualizado para coincidir con la versión actual de la base de datos
 const STORE_NAME = 'encrypted-accounts'
+const WEBAUTHN_STORE_NAME = 'webauthn-credentials'
 
 export interface EncryptedAccount {
   address: string // Clave primaria (keyPath)
@@ -30,124 +31,12 @@ export interface EncryptedAccount {
   updatedAt: number
 }
 
-let dbInstance: IDBDatabase | null = null
+// Usar el módulo compartido para evitar conflictos
+import { openSharedDB } from './indexedDB'
 
 async function openDB(): Promise<IDBDatabase> {
-  if (dbInstance) {
-    console.log('[IndexedDB] Usando instancia existente')
-    return dbInstance
-  }
-
-  // Verificar que IndexedDB esté disponible
-  if (!('indexedDB' in window)) {
-    const error = new Error('IndexedDB no está disponible en este navegador')
-    console.error('[IndexedDB] ❌', error.message)
-    throw error
-  }
-
-  console.log(`[IndexedDB] Abriendo base de datos: ${DB_NAME} (versión ${DB_VERSION})`)
-
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION)
-
-    request.onerror = () => {
-      const error = request.error || new Error('No se pudo abrir IndexedDB')
-      console.error('[IndexedDB] ❌ Error al abrir:', error)
-      reject(error)
-    }
-    
-    request.onsuccess = () => {
-      dbInstance = request.result
-      console.log('[IndexedDB] ✅ Base de datos abierta exitosamente')
-      resolve(dbInstance)
-    }
-
-    request.onupgradeneeded = (event) => {
-      console.log('[IndexedDB] Actualizando base de datos...')
-      const db = (event.target as IDBOpenDBRequest).result
-      const oldVersion = event.oldVersion || 0
-      const newVersion = event.newVersion || DB_VERSION
-
-      console.log(`[IndexedDB] Migrando de versión ${oldVersion} a ${newVersion}`)
-
-      // Si es una instalación nueva (sin versión anterior)
-      if (oldVersion === 0) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'address' })
-        
-        // Crear índices
-        store.createIndex('byType', 'type', { unique: false })
-        store.createIndex('byCreatedAt', 'createdAt', { unique: false })
-        store.createIndex('byName', 'meta.name', { unique: false })
-        
-        console.log(`[IndexedDB] ObjectStore '${STORE_NAME}' creado con índices`)
-      } else {
-        // Migración de versión 1 a 2: Agregar índices
-        if (oldVersion < 2) {
-          // Obtener el object store existente
-          const transaction = (event.target as IDBOpenDBRequest).transaction
-          if (!transaction) {
-            console.error('[IndexedDB] No se pudo obtener la transacción de migración')
-            return
-          }
-          
-          const store = transaction.objectStore(STORE_NAME)
-
-          // Crear índices para búsquedas eficientes (solo si no existen)
-          if (!store.indexNames.contains('byType')) {
-            store.createIndex('byType', 'type', { unique: false })
-            console.log('[IndexedDB] Índice "byType" creado')
-          }
-          
-          if (!store.indexNames.contains('byCreatedAt')) {
-            store.createIndex('byCreatedAt', 'createdAt', { unique: false })
-            console.log('[IndexedDB] Índice "byCreatedAt" creado')
-          }
-
-          if (!store.indexNames.contains('byName')) {
-            // Índice en meta.name (path anidado)
-            store.createIndex('byName', 'meta.name', { unique: false })
-            console.log('[IndexedDB] Índice "byName" creado')
-          }
-
-          // Migrar datos existentes: agregar campos faltantes
-          const getAllRequest = store.getAll()
-          getAllRequest.onsuccess = () => {
-            const accounts = getAllRequest.result as EncryptedAccount[]
-            let updated = 0
-            accounts.forEach((account) => {
-              let needsUpdate = false
-              const updatedAccount = { ...account }
-              
-              if (!updatedAccount.updatedAt) {
-                updatedAccount.updatedAt = updatedAccount.createdAt || Date.now()
-                needsUpdate = true
-              }
-              if (!updatedAccount.type) {
-                updatedAccount.type = 'sr25519' // Valor por defecto
-                needsUpdate = true
-              }
-              
-              if (needsUpdate) {
-                store.put(updatedAccount)
-                updated++
-              }
-            })
-            if (updated > 0) {
-              console.log(`[IndexedDB] ${updated} cuenta(s) actualizada(s) durante la migración`)
-            }
-            console.log('[IndexedDB] Migración a versión 2 completada')
-          }
-          getAllRequest.onerror = () => {
-            console.error('[IndexedDB] Error al migrar datos:', getAllRequest.error)
-          }
-        }
-      }
-    }
-    
-    request.onblocked = () => {
-      console.warn('[IndexedDB] ⚠️ Base de datos bloqueada. Cierra otras pestañas que usen esta base de datos.')
-    }
-  })
+  console.log('[IndexedDB] Abriendo base de datos compartida...')
+  return await openSharedDB()
 }
 
 export async function saveEncryptedAccount(account: EncryptedAccount): Promise<void> {

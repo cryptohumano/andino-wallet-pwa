@@ -8,14 +8,19 @@ interface KeyringContextType {
   accounts: KeyringAccount[]
   isUnlocked: boolean
   hasStoredAccounts: boolean
+  hasWebAuthnCredentials: boolean
   generateMnemonic: () => string
   unlock: (password: string) => Promise<boolean>
+  unlockWithWebAuthn: (credentialId: string) => Promise<boolean>
   lock: () => void
   addFromMnemonic: (mnemonic: string, name?: string, type?: 'sr25519' | 'ed25519' | 'ecdsa', password?: string) => Promise<KeyringAccount | null>
   addFromUri: (uri: string, name?: string, type?: 'sr25519' | 'ed25519' | 'ecdsa', password?: string) => Promise<KeyringAccount | null>
+  addFromJson: (jsonData: object, jsonPassword: string, password?: string) => Promise<KeyringAccount | null>
   removeAccount: (address: string) => Promise<boolean>
   getAccount: (address: string) => KeyringAccount | undefined
   setSS58Format: (format: number) => void
+  refreshWebAuthnCredentials: () => Promise<boolean>
+  refreshStoredAccounts: () => Promise<boolean>
 }
 
 const KeyringContext = createContext<KeyringContextType | undefined>(undefined)

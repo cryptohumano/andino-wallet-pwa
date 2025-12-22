@@ -10,6 +10,15 @@ import {
   deleteEncryptedAccount,
   type EncryptedAccount 
 } from '@/utils/secureStorage'
+import {
+  authenticateWithWebAuthn,
+  type WebAuthnCredential
+} from '@/utils/webauthn'
+import {
+  getWebAuthnCredential,
+  updateWebAuthnCredentialUsage,
+  getAllWebAuthnCredentials
+} from '@/utils/webauthnStorage'
 
 export interface KeyringAccount {
   pair: KeyringPair
@@ -27,41 +36,79 @@ export function useKeyring() {
   const [accounts, setAccounts] = useState<KeyringAccount[]>([])
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [hasStoredAccounts, setHasStoredAccounts] = useState(false)
+  const [hasWebAuthnCredentials, setHasWebAuthnCredentials] = useState(false)
+
+  // Función para verificar y actualizar el estado de credenciales WebAuthn
+  const checkWebAuthnCredentials = useCallback(async () => {
+    try {
+      const webauthnCreds = await getAllWebAuthnCredentials()
+      const hasCreds = webauthnCreds.length > 0
+      setHasWebAuthnCredentials(hasCreds)
+      console.log(`[Keyring] Credenciales WebAuthn: ${webauthnCreds.length} (actualizado)`)
+      return hasCreds
+    } catch (error) {
+      console.error('[Keyring] ❌ Error al verificar credenciales WebAuthn:', error)
+      setHasWebAuthnCredentials(false)
+      return false
+    }
+  }, [])
+
+  // Función para verificar y actualizar el estado de cuentas almacenadas
+  const checkStoredAccounts = useCallback(async () => {
+    try {
+      const stored = await getAllEncryptedAccounts()
+      const hasAccounts = stored.length > 0
+      setHasStoredAccounts(hasAccounts)
+      console.log(`[Keyring] Cuentas almacenadas: ${stored.length} (actualizado)`)
+      return hasAccounts
+    } catch (error) {
+      console.error('[Keyring] ❌ Error al verificar cuentas almacenadas:', error)
+      setHasStoredAccounts(false)
+      return false
+    }
+  }, [])
 
   useEffect(() => {
+    let isMounted = true // Flag para evitar actualizaciones después de desmontar
+    
     const initKeyring = async () => {
       console.log('[Keyring] Iniciando inicialización...')
       try {
         console.log('[Keyring] Esperando cryptoWaitReady()...')
         await cryptoWaitReady()
+        if (!isMounted) return
+        
         console.log('[Keyring] cryptoWaitReady() completado')
         
         // Crear Keyring sin tipo específico para soportar múltiples tipos (sr25519, ed25519, ecdsa)
         const kr = new Keyring({ ss58Format: 42 })
+        if (!isMounted) return
         setKeyring(kr)
         console.log('[Keyring] Keyring creado exitosamente')
         
         // Verificar si hay cuentas almacenadas
-        try {
-          console.log('[Keyring] Verificando cuentas almacenadas en IndexedDB...')
-          const stored = await getAllEncryptedAccounts()
-          console.log(`[Keyring] Cuentas encontradas: ${stored.length}`)
-          setHasStoredAccounts(stored.length > 0)
-        } catch (error) {
-          console.error('[Keyring] ❌ Error al verificar cuentas almacenadas:', error)
-          setHasStoredAccounts(false)
-        }
+        await checkStoredAccounts()
         
+        // Verificar si hay credenciales WebAuthn
+        await checkWebAuthnCredentials()
+        
+        if (!isMounted) return
         setIsReady(true)
         console.log('[Keyring] ✅ Inicialización completada')
       } catch (error) {
         console.error('[Keyring] ❌ Error al inicializar keyring:', error)
-        setIsReady(true) // Marcar como listo incluso si hay error para mostrar el componente
+        if (isMounted) {
+          setIsReady(true) // Marcar como listo incluso si hay error para mostrar el componente
+        }
       }
     }
 
     initKeyring()
-  }, [])
+    
+    return () => {
+      isMounted = false // Limpiar flag al desmontar
+    }
+  }, [checkStoredAccounts, checkWebAuthnCredentials])
 
   const generateMnemonic = useCallback(() => {
     return mnemonicGenerate()
@@ -91,11 +138,138 @@ export function useKeyring() {
       }
 
       // Desencriptar y cargar todas las cuentas
-      console.log(`[Keyring] Cargando ${encryptedAccounts.length} cuenta(s)...`)
+      console.log(`[Keyring] 📦 Cargando ${encryptedAccounts.length} cuenta(s) desde IndexedDB...`)
       const loadedAccounts: KeyringAccount[] = []
+      const failedAccounts: Array<{ address: string; error: any }> = []
+      
       for (const encAccount of encryptedAccounts) {
         try {
           const decryptedData = await decrypt(encAccount.encryptedData, password)
+          const { uri, mnemonic, type } = JSON.parse(decryptedData)
+          
+          // Usar uri si está disponible, sino mnemonic
+          const seed = uri || mnemonic
+          if (!seed) {
+            const error = new Error('No tiene uri ni mnemonic')
+            console.error(`[Keyring] ❌ Cuenta ${encAccount.address}: ${error.message}`)
+            failedAccounts.push({ address: encAccount.address, error })
+            continue
+          }
+          
+          // Agregar al keyring
+          const pair = keyring.addFromUri(seed, encAccount.meta, type || 'sr25519')
+          
+          // Verificar que la dirección coincida
+          if (pair.address !== encAccount.address) {
+            console.warn(`[Keyring] ⚠️ Dirección no coincide: esperada ${encAccount.address}, obtenida ${pair.address}`)
+          }
+          
+          loadedAccounts.push({
+            pair,
+            address: pair.address,
+            publicKey: pair.publicKey,
+            meta: pair.meta,
+          })
+          console.log(`[Keyring] ✅ Cuenta cargada: ${pair.address} (tipo: ${type || 'sr25519'})`)
+        } catch (error) {
+          console.error(`[Keyring] ❌ Error al cargar cuenta ${encAccount.address}:`, error)
+          failedAccounts.push({ address: encAccount.address, error })
+        }
+      }
+
+      // Resumen de carga
+      console.log(`[Keyring] 📊 Resumen de carga:`)
+      console.log(`  ✅ Cargadas exitosamente: ${loadedAccounts.length}`)
+      console.log(`  ❌ Fallidas: ${failedAccounts.length}`)
+      
+      if (failedAccounts.length > 0) {
+        console.warn(`[Keyring] ⚠️ Las siguientes cuentas no se pudieron cargar:`, failedAccounts)
+      }
+
+      // Verificar sincronización con keyring
+      const keyringPairs = keyring.getPairs()
+      console.log(`[Keyring] 🔍 Verificación de sincronización:`)
+      console.log(`  Keyring tiene ${keyringPairs.length} par(es)`)
+      console.log(`  Estado React tiene ${loadedAccounts.length} cuenta(s)`)
+      
+      if (keyringPairs.length !== loadedAccounts.length) {
+        console.warn(`[Keyring] ⚠️ Desincronización detectada entre keyring y estado React`)
+      }
+
+      setAccounts(loadedAccounts)
+      setIsUnlocked(true)
+      return true
+    } catch (error) {
+      console.error('Error al desbloquear keyring:', error)
+      return false
+    }
+  }, [keyring])
+
+  /**
+   * Desbloquea el keyring usando WebAuthn
+   * Deriva una clave maestra desde la firma WebAuthn y la usa para desencriptar las cuentas
+   */
+  const unlockWithWebAuthn = useCallback(async (credentialId: string): Promise<boolean> => {
+    if (!keyring) return false
+
+    try {
+      const encryptedAccounts = await getAllEncryptedAccounts()
+      
+      if (encryptedAccounts.length === 0) {
+        setIsUnlocked(true)
+        return true
+      }
+
+      // Obtener la credencial WebAuthn
+      const credential = await getWebAuthnCredential(credentialId)
+      if (!credential) {
+        console.error('[Keyring] Credencial WebAuthn no encontrada')
+        return false
+      }
+
+      // Autenticar con WebAuthn (esto verifica la identidad del usuario)
+      const authResult = await authenticateWithWebAuthn(credentialId)
+      
+      // Actualizar el uso de la credencial
+      await updateWebAuthnCredentialUsage(credentialId)
+      
+      console.log('[Keyring] ✅ Autenticación WebAuthn exitosa')
+      
+      // Obtener o generar el salt para la clave maestra
+      let masterKeySalt: Uint8Array
+      if (credential.masterKeySalt) {
+        // Convertir salt de base64url a Uint8Array
+        const { base64UrlToArrayBuffer } = await import('@/utils/webauthn')
+        const saltBuffer = base64UrlToArrayBuffer(credential.masterKeySalt)
+        masterKeySalt = new Uint8Array(saltBuffer)
+      } else {
+        // Si no hay salt, generar uno nuevo y guardarlo
+        const { generateMasterKeySalt, arrayBufferToBase64Url } = await import('@/utils/webauthn')
+        const { saveWebAuthnCredential } = await import('@/utils/webauthnStorage')
+        masterKeySalt = generateMasterKeySalt()
+        credential.masterKeySalt = arrayBufferToBase64Url(masterKeySalt.buffer)
+        await saveWebAuthnCredential(credential)
+        console.log('[Keyring] ✅ Salt de clave maestra generado y guardado')
+      }
+
+      // Derivar la clave maestra desde WebAuthn
+      const { deriveKeyFromWebAuthn } = await import('@/utils/webauthn')
+      const masterKey = await deriveKeyFromWebAuthn(
+        authResult.signature,
+        authResult.authenticatorData,
+        masterKeySalt
+      )
+      
+      console.log('[Keyring] ✅ Clave maestra derivada desde WebAuthn')
+
+      // Desencriptar y cargar todas las cuentas usando la clave maestra
+      const { decryptWithKey } = await import('@/utils/encryption')
+      const loadedAccounts: KeyringAccount[] = []
+      
+      for (const encAccount of encryptedAccounts) {
+        try {
+          // Intentar desencriptar con la clave maestra de WebAuthn
+          const decryptedData = await decryptWithKey(encAccount.encryptedData, masterKey)
           const { uri, mnemonic, type } = JSON.parse(decryptedData)
           
           // Usar uri si está disponible, sino mnemonic
@@ -114,16 +288,25 @@ export function useKeyring() {
           })
           console.log(`[Keyring] ✅ Cuenta cargada: ${pair.address}`)
         } catch (error) {
-          console.error(`[Keyring] ❌ Error al cargar cuenta ${encAccount.address}:`, error)
+          // Si falla, la cuenta puede estar encriptada con contraseña, no con WebAuthn
+          console.warn(`[Keyring] ⚠️ No se pudo desencriptar cuenta ${encAccount.address} con WebAuthn:`, error)
+          // Continuar con otras cuentas
         }
       }
 
-      console.log(`[Keyring] ✅ ${loadedAccounts.length} cuenta(s) cargada(s) exitosamente`)
+      if (loadedAccounts.length === 0) {
+        console.warn('[Keyring] ⚠️ No se pudieron cargar cuentas con WebAuthn. Puede que estén encriptadas con contraseña.')
+        // Aún así marcamos como desbloqueado para permitir crear nuevas cuentas
+        setIsUnlocked(true)
+        return true
+      }
+
+      console.log(`[Keyring] ✅ ${loadedAccounts.length} cuenta(s) cargada(s) exitosamente con WebAuthn`)
       setAccounts(loadedAccounts)
       setIsUnlocked(true)
       return true
     } catch (error) {
-      console.error('Error al desbloquear keyring:', error)
+      console.error('[Keyring] ❌ Error al desbloquear con WebAuthn:', error)
       return false
     }
   }, [keyring])
@@ -146,70 +329,246 @@ export function useKeyring() {
   }, [keyring, accounts])
 
   const addFromMnemonic = useCallback(async (mnemonic: string, name?: string, type: 'sr25519' | 'ed25519' | 'ecdsa' = 'sr25519', password?: string): Promise<KeyringAccount | null> => {
-    if (!keyring || !isUnlocked) return null
-
-    const pair = keyring.addFromUri(mnemonic, { name: name || 'Account' }, type)
-    const account: KeyringAccount = {
-      pair,
-      address: pair.address,
-      publicKey: pair.publicKey,
-      meta: pair.meta,
+    if (!keyring) {
+      console.error('[Keyring] ❌ No se puede agregar cuenta: keyring no inicializado')
+      return null
     }
 
-    setAccounts((prev) => [...prev, account])
+    // Verificar directamente en IndexedDB si hay cuentas almacenadas
+    // (más confiable que el estado React que puede no estar actualizado)
+    const encryptedAccounts = await getAllEncryptedAccounts()
+    const hasStored = encryptedAccounts.length > 0
 
-    // Guardar encriptado si hay contraseña
-    if (password) {
-      try {
-        const encryptedData = await encrypt(JSON.stringify({ mnemonic, type }), password)
-        await saveEncryptedAccount({
-          address: account.address,
-          encryptedData,
-          publicKey: u8aToHex(account.publicKey),
-          meta: account.meta,
-          createdAt: Date.now(),
-        })
-      } catch (error) {
-        console.error('Error al guardar cuenta encriptada:', error)
+    // Permitir agregar cuenta si:
+    // 1. No hay cuentas almacenadas (primera vez) - no requiere desbloqueo
+    // 2. O si está desbloqueado (cuentas existentes)
+    if (!isUnlocked && hasStored) {
+      console.error('[Keyring] ❌ No se puede agregar cuenta: keyring no desbloqueado')
+      return null
+    }
+
+    // Si no hay cuentas almacenadas, marcar como desbloqueado para permitir la creación
+    if (!hasStored && !isUnlocked) {
+      console.log('[Keyring] Primera cuenta: marcando keyring como desbloqueado')
+      setIsUnlocked(true)
+    }
+
+    try {
+      // 1. Agregar al keyring
+      const pair = keyring.addFromUri(mnemonic, { name: name || 'Account' }, type)
+      console.log(`[Keyring] ✅ Cuenta agregada al keyring: ${pair.address}`)
+      
+      const account: KeyringAccount = {
+        pair,
+        address: pair.address,
+        publicKey: pair.publicKey,
+        meta: pair.meta,
       }
+
+      // 2. Actualizar estado React
+      setAccounts((prev) => {
+        const updated = [...prev, account]
+        console.log(`[Keyring] 📊 Total de cuentas en estado React: ${updated.length}`)
+        return updated
+      })
+
+      // 3. Guardar encriptado en IndexedDB (requiere contraseña)
+      if (password) {
+        try {
+          const encryptedData = await encrypt(JSON.stringify({ mnemonic, uri: null, type }), password)
+          await saveEncryptedAccount({
+            address: account.address,
+            encryptedData,
+            publicKey: u8aToHex(account.publicKey),
+            type,
+            meta: account.meta,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          })
+          console.log(`[Keyring] ✅ Cuenta guardada en IndexedDB: ${account.address}`)
+          
+          // Actualizar hasStoredAccounts después de guardar
+          setHasStoredAccounts(true)
+        } catch (error) {
+          console.error('[Keyring] ❌ Error al guardar cuenta encriptada:', error)
+          // Remover del keyring si falla el guardado
+          try {
+            keyring.removePair(account.address)
+            setAccounts((prev) => prev.filter(acc => acc.address !== account.address))
+          } catch {}
+          throw error
+        }
+      } else {
+        console.warn(`[Keyring] ⚠️ Cuenta ${account.address} agregada al keyring pero NO guardada en IndexedDB (sin contraseña). Se perderá al bloquear el keyring.`)
+      }
+
+      return account
+    } catch (error) {
+      console.error('[Keyring] ❌ Error al agregar cuenta desde mnemonic:', error)
+      throw error
+    }
+  }, [keyring, isUnlocked, hasStoredAccounts])
+
+  /**
+   * Importa una cuenta desde un archivo JSON de Polkadot.js
+   * @param jsonData Objeto JSON con el formato de Polkadot.js
+   * @param jsonPassword Contraseña para desencriptar el JSON
+   * @param password Contraseña opcional para encriptar en nuestro sistema
+   */
+  const addFromJson = useCallback(async (
+    jsonData: object,
+    jsonPassword: string,
+    password?: string
+  ): Promise<KeyringAccount | null> => {
+    if (!keyring) {
+      console.error('[Keyring] ❌ No se puede agregar cuenta: keyring no inicializado')
+      return null
     }
 
-    return account
-  }, [keyring, isUnlocked])
+    // Verificar directamente en IndexedDB si hay cuentas almacenadas
+    const encryptedAccounts = await getAllEncryptedAccounts()
+    const hasStored = encryptedAccounts.length > 0
+
+    // Permitir agregar cuenta si:
+    // 1. No hay cuentas almacenadas (primera vez) - no requiere desbloqueo
+    // 2. O si está desbloqueado (cuentas existentes)
+    if (!isUnlocked && hasStored) {
+      console.error('[Keyring] ❌ No se puede agregar cuenta: keyring no desbloqueado')
+      return null
+    }
+
+    // Si no hay cuentas almacenadas, marcar como desbloqueado
+    if (!hasStored && !isUnlocked) {
+      console.log('[Keyring] Primera cuenta: marcando keyring como desbloqueado')
+      setIsUnlocked(true)
+    }
+
+    try {
+      // Validar formato JSON de Polkadot.js
+      if (!('address' in jsonData) || !('encoded' in jsonData)) {
+        throw new Error('El JSON no tiene el formato correcto de Polkadot.js (falta address o encoded)')
+      }
+
+      // Agregar al keyring usando el método de Polkadot.js
+      const pair = keyring.addFromJson(jsonData as any, jsonPassword)
+      console.log(`[Keyring] ✅ Cuenta agregada al keyring desde JSON: ${pair.address}`)
+
+      const account: KeyringAccount = {
+        pair,
+        address: pair.address,
+        publicKey: pair.publicKey,
+        meta: pair.meta,
+      }
+
+      // Actualizar estado React
+      setAccounts((prev) => {
+        const updated = [...prev, account]
+        console.log(`[Keyring] 📊 Total de cuentas en estado React: ${updated.length}`)
+        return updated
+      })
+
+      // Guardar encriptado en IndexedDB
+      // Para JSON de Polkadot.js, guardamos el JSON original (sin la contraseña del JSON)
+      // La contraseña del JSON se pedirá al desbloquear
+      if (password) {
+        try {
+          // Extraer el tipo del encoding
+          const cryptoType = (jsonData as any).encoding?.content?.[1] || 'sr25519'
+          
+          // Guardar el JSON original encriptado con nuestra contraseña
+          // No guardamos jsonPassword por seguridad
+          const encryptedData = await encrypt(JSON.stringify({ jsonData, isPolkadotJson: true }), password)
+          await saveEncryptedAccount({
+            address: account.address,
+            encryptedData,
+            publicKey: u8aToHex(account.publicKey),
+            type: cryptoType,
+            meta: account.meta,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          })
+          console.log(`[Keyring] ✅ Cuenta guardada en IndexedDB: ${account.address}`)
+          setHasStoredAccounts(true)
+        } catch (error) {
+          console.error('[Keyring] ❌ Error al guardar cuenta encriptada:', error)
+          // Remover del keyring si falla el guardado
+          try {
+            keyring.removePair(account.address)
+            setAccounts((prev) => prev.filter(acc => acc.address !== account.address))
+          } catch {}
+          throw error
+        }
+      } else {
+        console.warn(`[Keyring] ⚠️ Cuenta ${account.address} agregada al keyring pero NO guardada en IndexedDB (sin contraseña). Se perderá al bloquear el keyring.`)
+      }
+
+      return account
+    } catch (error) {
+      console.error('[Keyring] ❌ Error al agregar cuenta desde JSON:', error)
+      throw error
+    }
+  }, [keyring, isUnlocked, hasStoredAccounts])
 
   const addFromUri = useCallback(async (uri: string, name?: string, type: 'sr25519' | 'ed25519' | 'ecdsa' = 'sr25519', password?: string): Promise<KeyringAccount | null> => {
-    if (!keyring || !isUnlocked) return null
-
-    const pair = keyring.addFromUri(uri, { name: name || 'Account' }, type)
-    const account: KeyringAccount = {
-      pair,
-      address: pair.address,
-      publicKey: pair.publicKey,
-      meta: pair.meta,
+    if (!keyring || !isUnlocked) {
+      console.error('[Keyring] ❌ No se puede agregar cuenta: keyring no inicializado o no desbloqueado')
+      return null
     }
 
-    setAccounts((prev) => [...prev, account])
-
-    // Guardar encriptado si hay contraseña
-    if (password) {
-      try {
-        const encryptedData = await encrypt(JSON.stringify({ uri, type }), password)
-        await saveEncryptedAccount({
-          address: account.address,
-          encryptedData,
-          publicKey: u8aToHex(account.publicKey),
-          meta: account.meta,
-          createdAt: Date.now(),
-        })
-        // Actualizar hasStoredAccounts después de guardar
-        setHasStoredAccounts(true)
-      } catch (error) {
-        console.error('Error al guardar cuenta encriptada:', error)
-        throw error
+    try {
+      // 1. Agregar al keyring
+      const pair = keyring.addFromUri(uri, { name: name || 'Account' }, type)
+      console.log(`[Keyring] ✅ Cuenta agregada al keyring: ${pair.address}`)
+      
+      const account: KeyringAccount = {
+        pair,
+        address: pair.address,
+        publicKey: pair.publicKey,
+        meta: pair.meta,
       }
-    }
 
-    return account
+      // 2. Actualizar estado React
+      setAccounts((prev) => {
+        const updated = [...prev, account]
+        console.log(`[Keyring] 📊 Total de cuentas en estado React: ${updated.length}`)
+        return updated
+      })
+
+      // 3. Guardar encriptado en IndexedDB (requiere contraseña)
+      if (password) {
+        try {
+          const encryptedData = await encrypt(JSON.stringify({ uri, mnemonic: null, type }), password)
+          await saveEncryptedAccount({
+            address: account.address,
+            encryptedData,
+            publicKey: u8aToHex(account.publicKey),
+            type,
+            meta: account.meta,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          })
+          console.log(`[Keyring] ✅ Cuenta guardada en IndexedDB: ${account.address}`)
+          
+          // Actualizar hasStoredAccounts después de guardar
+          setHasStoredAccounts(true)
+        } catch (error) {
+          console.error('[Keyring] ❌ Error al guardar cuenta encriptada:', error)
+          // Remover del keyring si falla el guardado
+          try {
+            keyring.removePair(account.address)
+            setAccounts((prev) => prev.filter(acc => acc.address !== account.address))
+          } catch {}
+          throw error
+        }
+      } else {
+        console.warn(`[Keyring] ⚠️ Cuenta ${account.address} agregada al keyring pero NO guardada en IndexedDB (sin contraseña). Se perderá al bloquear el keyring.`)
+      }
+
+      return account
+    } catch (error) {
+      console.error('[Keyring] ❌ Error al agregar cuenta desde URI:', error)
+      throw error
+    }
   }, [keyring, isUnlocked])
 
   const removeAccount = useCallback(async (address: string) => {
@@ -253,14 +612,19 @@ export function useKeyring() {
     accounts,
     isUnlocked,
     hasStoredAccounts,
+    hasWebAuthnCredentials,
     generateMnemonic,
     unlock,
+    unlockWithWebAuthn,
     lock,
     addFromMnemonic,
     addFromUri,
+    addFromJson,
     removeAccount,
     getAccount,
     setSS58Format,
+    refreshWebAuthnCredentials: checkWebAuthnCredentials,
+    refreshStoredAccounts: checkStoredAccounts,
   }
 }
 
