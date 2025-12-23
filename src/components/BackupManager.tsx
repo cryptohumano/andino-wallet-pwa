@@ -47,6 +47,7 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
     contactsImported: number
     apiConfigsImported: number
     webauthnImported: number
+    transactionsImported: number
     errors: string[]
   } | null>(null)
 
@@ -163,19 +164,21 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
       console.log(`[BackupManager] Datos refrescados - hasAccounts: ${hasAccounts}, hasWebAuthn: ${hasWebAuthn}`)
 
       // Mostrar resumen
-      const totalImported = 
-        result.accountsImported +
-        result.contactsImported +
-        result.apiConfigsImported +
-        result.webauthnImported
+          const totalImported = 
+            result.accountsImported +
+            result.contactsImported +
+            result.apiConfigsImported +
+            result.webauthnImported +
+            result.transactionsImported
 
-      if (totalImported > 0) {
-        setSuccess(
-          `Importación completada: ${result.accountsImported} cuenta(s), ` +
-          `${result.contactsImported} contacto(s), ` +
-          `${result.apiConfigsImported} configuración(es) de API, ` +
-          `${result.webauthnImported} credencial(es) WebAuthn`
-        )
+          if (totalImported > 0) {
+            setSuccess(
+              `Importación completada: ${result.accountsImported} cuenta(s), ` +
+              `${result.contactsImported} contacto(s), ` +
+              `${result.apiConfigsImported} configuración(es) de API, ` +
+              `${result.webauthnImported} credencial(es) WebAuthn, ` +
+              `${result.transactionsImported} transacción(es)`
+            )
       } else {
         setSuccess('No se importaron nuevos datos (puede que ya existan)')
       }
@@ -338,7 +341,7 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
 
       {/* Diálogo de confirmación de importación */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] sm:max-h-[80vh] overflow-y-auto mx-4 sm:mx-0">
           <DialogHeader>
             <DialogTitle>Confirmar Importación</DialogTitle>
             <DialogDescription>

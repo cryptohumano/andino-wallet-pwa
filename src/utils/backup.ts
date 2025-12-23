@@ -5,12 +5,14 @@
 import { openSharedDB } from './indexedDB'
 import type { EncryptedAccount } from './secureStorage'
 import type { WebAuthnCredential } from './webauthn'
+import type { StoredTransaction } from './transactionStorage'
 
 export interface BackupData {
   version: string
   createdAt: number
   accounts: EncryptedAccount[]
   webauthnCredentials: WebAuthnCredential[]
+  transactions: StoredTransaction[]
   contacts: any[]
   apiConfigs: any[]
   metadata?: {
@@ -42,12 +44,24 @@ export async function exportBackup(): Promise<BackupData> {
       request.onsuccess = () => {
         const results = request.result as EncryptedAccount[]
         accounts.push(...results)
-        console.log(`[Backup] ✅ ${results.length} cuenta(s) exportada(s)`)
-        resolve()
+        console.log(`[Backup] ✅ ${results.length} cuenta(s) encontrada(s) en IndexedDB`)
+        // Esperar a que la transacción se complete
       }
       request.onerror = () => {
         const error = request.error || new Error('Error al leer cuentas')
         console.error('[Backup] ❌ Error al leer cuentas:', error)
+        reject(error)
+      }
+      
+      // Esperar a que la transacción se complete para asegurar que los datos estén disponibles
+      transaction.oncomplete = () => {
+        console.log(`[Backup] ✅ Transacción completada - ${accounts.length} cuenta(s) exportada(s)`)
+        resolve()
+      }
+      
+      transaction.onerror = () => {
+        const error = transaction.error || request.error || new Error('Error en la transacción')
+        console.error('[Backup] ❌ Error en transacción al leer cuentas:', error)
         reject(error)
       }
     })
@@ -96,7 +110,7 @@ export async function exportBackup(): Promise<BackupData> {
     // No fallar si no hay contactos
   }
 
-  // 4. Obtener configuraciones de API de localStorage
+  // 5. Obtener configuraciones de API de localStorage
   const apiConfigs: any[] = []
   try {
     const stored = localStorage.getItem(API_CONFIGS_STORAGE_KEY)
@@ -115,6 +129,7 @@ export async function exportBackup(): Promise<BackupData> {
     createdAt: Date.now(),
     accounts,
     webauthnCredentials,
+    transactions,
     contacts,
     apiConfigs,
     metadata: {
@@ -173,6 +188,9 @@ export function readBackupFile(file: File): Promise<BackupData> {
         if (!Array.isArray(backup.webauthnCredentials)) {
           backup.webauthnCredentials = []
         }
+        if (!Array.isArray(backup.transactions)) {
+          backup.transactions = []
+        }
         if (!Array.isArray(backup.contacts)) {
           backup.contacts = []
         }
@@ -222,6 +240,7 @@ export async function importBackup(
   let contactsImported = 0
   let apiConfigsImported = 0
   let webauthnImported = 0
+  let transactionsImported = 0
 
   // 1. Importar cuentas
   if (backup.accounts && backup.accounts.length > 0) {
@@ -474,12 +493,92 @@ export async function importBackup(
     }
   }
 
+  // 5. Importar transacciones
+  if (backup.transactions && backup.transactions.length > 0) {
+    try {
+      console.log(`[Backup] Importando ${backup.transactions.length} transacción(es)...`)
+      const db = await openSharedDB()
+      const transaction = db.transaction(['transactions'], 'readwrite')
+      const store = transaction.objectStore('transactions')
+
+      for (const tx of backup.transactions) {
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            console.warn(`[Backup] ⚠️ Timeout verificando transacción ${tx.id}`)
+            resolve()
+          }, 5000)
+
+          try {
+            const existingRequest = store.get(tx.id)
+            existingRequest.onsuccess = () => {
+              clearTimeout(timeout)
+              const exists = existingRequest.result !== undefined
+              if (exists && !options.overwriteAccounts) {
+                console.log(`[Backup] ⚠️ Transacción ${tx.id} ya existe, omitiendo`)
+                resolve()
+                return
+              }
+
+              const putRequest = store.put(tx)
+              putRequest.onsuccess = () => {
+                transactionsImported++
+                console.log(`[Backup] ✅ Transacción importada: ${tx.id}`)
+                resolve()
+              }
+              putRequest.onerror = () => {
+                const error = putRequest.error || new Error('Error al importar transacción')
+                errors.push(`Error al importar transacción ${tx.id}: ${error.message}`)
+                console.error('[Backup] ❌', error)
+                resolve()
+              }
+            }
+            existingRequest.onerror = () => {
+              clearTimeout(timeout)
+              errors.push(`Error al verificar transacción ${tx.id}`)
+              resolve()
+            }
+          } catch (error) {
+            errors.push(`Error al procesar transacción ${tx.id}`)
+            clearTimeout(timeout)
+            resolve()
+          }
+        })
+      }
+      
+      console.log(`[Backup] ✅ ${transactionsImported} transacción(es) procesada(s) de ${backup.transactions.length}`)
+
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          console.warn('[Backup] ⚠️ Timeout esperando transacción de transacciones')
+          resolve()
+        }, 10000)
+
+        transaction.oncomplete = () => {
+          clearTimeout(timeout)
+          console.log('[Backup] ✅ Transacción de transacciones completada')
+          resolve()
+        }
+        transaction.onerror = () => {
+          clearTimeout(timeout)
+          const error = transaction.error || new Error('Error en la transacción de transacciones')
+          errors.push(`Error en la transacción de transacciones: ${error.message}`)
+          console.error('[Backup] ❌ Error en transacción de transacciones:', error)
+          resolve()
+        }
+      })
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (error) {
+      errors.push(`Error al importar transacciones: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   console.log('[Backup] ✅ Importación completada')
   return {
     accountsImported,
     contactsImported,
     apiConfigsImported,
     webauthnImported,
+    transactionsImported,
     errors,
   }
 }

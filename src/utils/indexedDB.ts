@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'pwa-substrate-keyring'
-const DB_VERSION = 4 // Incrementado para manejar la versión actual
+const DB_VERSION = 6 // Incrementado para agregar stores de documentos
 
 let dbInstance: IDBDatabase | null = null
 let openPromise: Promise<IDBDatabase> | null = null
@@ -15,10 +15,22 @@ let openPromise: Promise<IDBDatabase> | null = null
  * Si hay una conexión en progreso, espera a que termine
  */
 export async function openSharedDB(): Promise<IDBDatabase> {
-  // Si ya hay una instancia, devolverla
+  // Si ya hay una instancia, verificar que tenga todos los stores necesarios
   if (dbInstance) {
-    console.log('[IndexedDB Shared] Usando instancia existente')
-    return dbInstance
+    // Verificar que todos los stores necesarios existen
+    const requiredStores = ['encrypted-accounts', 'webauthn-credentials', 'transactions', 'documents', 'external-api-configs', 'document-queue']
+    const missingStores = requiredStores.filter(store => !dbInstance.objectStoreNames.contains(store))
+    if (missingStores.length > 0) {
+      console.warn(`[IndexedDB Shared] ⚠️ Faltan stores: ${missingStores.join(', ')}. Cerrando conexión para forzar migración...`)
+      dbInstance.close()
+      dbInstance = null
+      openPromise = null
+      // Esperar un momento para que la conexión se cierre completamente
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } else {
+      console.log('[IndexedDB Shared] Usando instancia existente')
+      return dbInstance
+    }
   }
 
   // Si hay una conexión en progreso, esperar a que termine
@@ -157,14 +169,25 @@ export async function openSharedDB(): Promise<IDBDatabase> {
       const db = req.result
       const STORE_NAME = 'encrypted-accounts'
       const WEBAUTHN_STORE_NAME = 'webauthn-credentials'
+      const TRANSACTIONS_STORE_NAME = 'transactions'
+      const DOCUMENTS_STORE_NAME = 'documents'
+      const EXTERNAL_API_CONFIGS_STORE_NAME = 'external-api-configs'
+      const DOCUMENT_QUEUE_STORE_NAME = 'document-queue'
       
       // Verificar que los stores existan
+      
       const hasAccountsStore = db.objectStoreNames.contains(STORE_NAME)
       const hasWebAuthnStore = db.objectStoreNames.contains(WEBAUTHN_STORE_NAME)
+      const hasTransactionsStore = db.objectStoreNames.contains(TRANSACTIONS_STORE_NAME)
+      const hasDocumentsStore = db.objectStoreNames.contains(DOCUMENTS_STORE_NAME)
+      const hasExternalAPIConfigsStore = db.objectStoreNames.contains(EXTERNAL_API_CONFIGS_STORE_NAME)
+      const hasDocumentQueueStore = db.objectStoreNames.contains(DOCUMENT_QUEUE_STORE_NAME)
+      const hasCorrectVersion = db.version === DB_VERSION
       
       console.log('[IndexedDB Shared] Stores disponibles:', Array.from(db.objectStoreNames))
+      console.log(`[IndexedDB Shared] Versión de DB: ${db.version}, esperada: ${DB_VERSION}`)
       
-      if (!hasAccountsStore || !hasWebAuthnStore) {
+      if (!hasAccountsStore || !hasWebAuthnStore || !hasTransactionsStore || !hasDocumentsStore || !hasExternalAPIConfigsStore || !hasDocumentQueueStore || !hasCorrectVersion) {
         console.warn('[IndexedDB Shared] ⚠️ Faltan stores, cerrando y eliminando base de datos para recrearla...')
         db.close()
         dbInstance = null
@@ -208,6 +231,46 @@ export async function openSharedDB(): Promise<IDBDatabase> {
             const webauthnStore = recreateDb.createObjectStore(WEBAUTHN_STORE_NAME, { keyPath: 'id' })
             webauthnStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
             console.log(`[IndexedDB Shared] ObjectStore '${WEBAUTHN_STORE_NAME}' creado`)
+            
+            // Crear store de transacciones
+            const TRANSACTIONS_STORE_NAME = 'transactions'
+            const transactionsStore = recreateDb.createObjectStore(TRANSACTIONS_STORE_NAME, { keyPath: 'id' })
+            transactionsStore.createIndex('byAccount', 'accountAddress', { unique: false })
+            transactionsStore.createIndex('byChain', 'chain', { unique: false })
+            transactionsStore.createIndex('byStatus', 'status', { unique: false })
+            transactionsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+            console.log(`[IndexedDB Shared] ObjectStore '${TRANSACTIONS_STORE_NAME}' creado con índices`)
+
+            // Crear store de documentos
+            const DOCUMENTS_STORE_NAME = 'documents'
+            const documentsStore = recreateDb.createObjectStore(DOCUMENTS_STORE_NAME, { keyPath: 'documentId' })
+            documentsStore.createIndex('byType', 'type', { unique: false })
+            documentsStore.createIndex('byHash', 'pdfHash', { unique: false })
+            documentsStore.createIndex('byAccount', 'relatedAccount', { unique: false })
+            documentsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+            documentsStore.createIndex('bySynced', 'synced', { unique: false })
+            documentsStore.createIndex('bySignatureStatus', 'signatureStatus', { unique: false })
+            documentsStore.createIndex('byBatchId', 'batchId', { unique: false })
+            documentsStore.createIndex('byUpdatedAt', 'updatedAt', { unique: false })
+            console.log(`[IndexedDB Shared] ObjectStore '${DOCUMENTS_STORE_NAME}' creado con índices`)
+
+            // Crear store de configuraciones de API externa
+            const EXTERNAL_API_CONFIGS_STORE_NAME = 'external-api-configs'
+            const externalAPIConfigsStore = recreateDb.createObjectStore(EXTERNAL_API_CONFIGS_STORE_NAME, { keyPath: 'apiId' })
+            externalAPIConfigsStore.createIndex('byName', 'name', { unique: false })
+            externalAPIConfigsStore.createIndex('byActive', 'isActive', { unique: false })
+            externalAPIConfigsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+            console.log(`[IndexedDB Shared] ObjectStore '${EXTERNAL_API_CONFIGS_STORE_NAME}' creado con índices`)
+
+            // Crear store de cola de documentos
+            const DOCUMENT_QUEUE_STORE_NAME = 'document-queue'
+            const documentQueueStore = recreateDb.createObjectStore(DOCUMENT_QUEUE_STORE_NAME, { keyPath: 'id' })
+            documentQueueStore.createIndex('byStatus', 'status', { unique: false })
+            documentQueueStore.createIndex('byPriority', 'priority', { unique: false })
+            documentQueueStore.createIndex('byDocument', 'documentId', { unique: false })
+            documentQueueStore.createIndex('byExternalApi', 'externalApiId', { unique: false })
+            documentQueueStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+            console.log(`[IndexedDB Shared] ObjectStore '${DOCUMENT_QUEUE_STORE_NAME}' creado con índices`)
           }
         }
         
@@ -232,6 +295,10 @@ export async function openSharedDB(): Promise<IDBDatabase> {
 
       const STORE_NAME = 'encrypted-accounts'
       const WEBAUTHN_STORE_NAME = 'webauthn-credentials'
+      const TRANSACTIONS_STORE_NAME = 'transactions'
+      const DOCUMENTS_STORE_NAME = 'documents'
+      const EXTERNAL_API_CONFIGS_STORE_NAME = 'external-api-configs'
+      const DOCUMENT_QUEUE_STORE_NAME = 'document-queue'
 
       try {
         // Si es una instalación nueva (sin versión anterior)
@@ -247,6 +314,42 @@ export async function openSharedDB(): Promise<IDBDatabase> {
           const webauthnStore = db.createObjectStore(WEBAUTHN_STORE_NAME, { keyPath: 'id' })
           webauthnStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
           console.log(`[IndexedDB Shared] ObjectStore '${WEBAUTHN_STORE_NAME}' creado`)
+
+          // Crear store de transacciones
+          const transactionsStore = db.createObjectStore(TRANSACTIONS_STORE_NAME, { keyPath: 'id' })
+          transactionsStore.createIndex('byAccount', 'accountAddress', { unique: false })
+          transactionsStore.createIndex('byChain', 'chain', { unique: false })
+          transactionsStore.createIndex('byStatus', 'status', { unique: false })
+          transactionsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+          console.log(`[IndexedDB Shared] ObjectStore '${TRANSACTIONS_STORE_NAME}' creado con índices`)
+
+          // Crear store de documentos
+          const documentsStore = db.createObjectStore(DOCUMENTS_STORE_NAME, { keyPath: 'documentId' })
+          documentsStore.createIndex('byType', 'type', { unique: false })
+          documentsStore.createIndex('byHash', 'pdfHash', { unique: false })
+          documentsStore.createIndex('byAccount', 'relatedAccount', { unique: false })
+          documentsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+          documentsStore.createIndex('bySynced', 'synced', { unique: false })
+          documentsStore.createIndex('bySignatureStatus', 'signatureStatus', { unique: false })
+          documentsStore.createIndex('byBatchId', 'batchId', { unique: false })
+          documentsStore.createIndex('byUpdatedAt', 'updatedAt', { unique: false })
+          console.log(`[IndexedDB Shared] ObjectStore '${DOCUMENTS_STORE_NAME}' creado con índices`)
+
+          // Crear store de configuraciones de API externa
+          const externalAPIConfigsStore = db.createObjectStore(EXTERNAL_API_CONFIGS_STORE_NAME, { keyPath: 'apiId' })
+          externalAPIConfigsStore.createIndex('byName', 'name', { unique: false })
+          externalAPIConfigsStore.createIndex('byActive', 'isActive', { unique: false })
+          externalAPIConfigsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+          console.log(`[IndexedDB Shared] ObjectStore '${EXTERNAL_API_CONFIGS_STORE_NAME}' creado con índices`)
+
+          // Crear store de cola de documentos
+          const documentQueueStore = db.createObjectStore(DOCUMENT_QUEUE_STORE_NAME, { keyPath: 'id' })
+          documentQueueStore.createIndex('byStatus', 'status', { unique: false })
+          documentQueueStore.createIndex('byPriority', 'priority', { unique: false })
+          documentQueueStore.createIndex('byDocument', 'documentId', { unique: false })
+          documentQueueStore.createIndex('byExternalApi', 'externalApiId', { unique: false })
+          documentQueueStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+          console.log(`[IndexedDB Shared] ObjectStore '${DOCUMENT_QUEUE_STORE_NAME}' creado con índices`)
         } else {
           const transaction = (event.target as IDBOpenDBRequest).transaction
           if (!transaction) {
@@ -282,6 +385,83 @@ export async function openSharedDB(): Promise<IDBDatabase> {
               const webauthnStore = db.createObjectStore(WEBAUTHN_STORE_NAME, { keyPath: 'id' })
               webauthnStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
               console.log(`[IndexedDB Shared] ObjectStore '${WEBAUTHN_STORE_NAME}' creado`)
+            }
+          }
+
+          // Migración de versión 3 a 4: (puede agregarse aquí si hay cambios futuros)
+          // Por ahora no hay cambios en la versión 4
+
+          // Migración de versión 4 a 5: Agregar store de transacciones
+          if (oldVersion < 5) {
+            console.log('[IndexedDB Shared] Migrando de versión 4 a 5: Agregando store de transacciones...')
+            if (!db.objectStoreNames.contains(TRANSACTIONS_STORE_NAME)) {
+              try {
+                const transactionsStore = db.createObjectStore(TRANSACTIONS_STORE_NAME, { keyPath: 'id' })
+                transactionsStore.createIndex('byAccount', 'accountAddress', { unique: false })
+                transactionsStore.createIndex('byChain', 'chain', { unique: false })
+                transactionsStore.createIndex('byStatus', 'status', { unique: false })
+                transactionsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+                console.log(`[IndexedDB Shared] ✅ ObjectStore '${TRANSACTIONS_STORE_NAME}' creado con índices`)
+              } catch (error) {
+                console.error(`[IndexedDB Shared] ❌ Error al crear store '${TRANSACTIONS_STORE_NAME}':`, error)
+                throw error
+              }
+            } else {
+              console.log(`[IndexedDB Shared] ⚠️ ObjectStore '${TRANSACTIONS_STORE_NAME}' ya existe`)
+            }
+          }
+
+          // Migración de versión 5 a 6: Agregar stores de documentos
+          if (oldVersion < 6) {
+            console.log('[IndexedDB Shared] Migrando de versión 5 a 6: Agregando stores de documentos...')
+            
+            // Store de documentos
+            if (!db.objectStoreNames.contains(DOCUMENTS_STORE_NAME)) {
+              try {
+                const documentsStore = db.createObjectStore(DOCUMENTS_STORE_NAME, { keyPath: 'documentId' })
+                documentsStore.createIndex('byType', 'type', { unique: false })
+                documentsStore.createIndex('byHash', 'pdfHash', { unique: false })
+                documentsStore.createIndex('byAccount', 'relatedAccount', { unique: false })
+                documentsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+                documentsStore.createIndex('bySynced', 'synced', { unique: false })
+                documentsStore.createIndex('bySignatureStatus', 'signatureStatus', { unique: false })
+                documentsStore.createIndex('byBatchId', 'batchId', { unique: false })
+                documentsStore.createIndex('byUpdatedAt', 'updatedAt', { unique: false })
+                console.log(`[IndexedDB Shared] ✅ ObjectStore '${DOCUMENTS_STORE_NAME}' creado con índices`)
+              } catch (error) {
+                console.error(`[IndexedDB Shared] ❌ Error al crear store '${DOCUMENTS_STORE_NAME}':`, error)
+                throw error
+              }
+            }
+
+            // Store de configuraciones de API externa
+            if (!db.objectStoreNames.contains(EXTERNAL_API_CONFIGS_STORE_NAME)) {
+              try {
+                const externalAPIConfigsStore = db.createObjectStore(EXTERNAL_API_CONFIGS_STORE_NAME, { keyPath: 'apiId' })
+                externalAPIConfigsStore.createIndex('byName', 'name', { unique: false })
+                externalAPIConfigsStore.createIndex('byActive', 'isActive', { unique: false })
+                externalAPIConfigsStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+                console.log(`[IndexedDB Shared] ✅ ObjectStore '${EXTERNAL_API_CONFIGS_STORE_NAME}' creado con índices`)
+              } catch (error) {
+                console.error(`[IndexedDB Shared] ❌ Error al crear store '${EXTERNAL_API_CONFIGS_STORE_NAME}':`, error)
+                throw error
+              }
+            }
+
+            // Store de cola de documentos
+            if (!db.objectStoreNames.contains(DOCUMENT_QUEUE_STORE_NAME)) {
+              try {
+                const documentQueueStore = db.createObjectStore(DOCUMENT_QUEUE_STORE_NAME, { keyPath: 'id' })
+                documentQueueStore.createIndex('byStatus', 'status', { unique: false })
+                documentQueueStore.createIndex('byPriority', 'priority', { unique: false })
+                documentQueueStore.createIndex('byDocument', 'documentId', { unique: false })
+                documentQueueStore.createIndex('byExternalApi', 'externalApiId', { unique: false })
+                documentQueueStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+                console.log(`[IndexedDB Shared] ✅ ObjectStore '${DOCUMENT_QUEUE_STORE_NAME}' creado con índices`)
+              } catch (error) {
+                console.error(`[IndexedDB Shared] ❌ Error al crear store '${DOCUMENT_QUEUE_STORE_NAME}':`, error)
+                throw error
+              }
             }
           }
         }

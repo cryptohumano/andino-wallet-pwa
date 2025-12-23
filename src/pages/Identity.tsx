@@ -30,10 +30,9 @@ export default function Identity() {
     selectedAddress || null
   )
 
-  const formatBalance = (value: bigint) => {
-    // Convertir de Planck a DOT (dividir por 10^10)
-    const dotValue = Number(value) / 1e10
-    return dotValue.toFixed(4)
+  // Usar la utilidad de formateo de balances
+  const formatBalance = (value: bigint, chainName: string) => {
+    return formatBalanceForDisplay(value, chainName)
   }
 
   const formatAddress = (address: string) => {
@@ -320,19 +319,19 @@ export default function Identity() {
                           <div className="space-y-1 text-sm">
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Libre:</span>
-                              <span className="font-medium">{formatBalance(balance.free)} DOT</span>
+                              <span className="font-medium">{formatBalance(balance.free, balance.chainName)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Reservado:</span>
-                              <span>{formatBalance(balance.reserved)} DOT</span>
+                              <span>{formatBalance(balance.reserved, balance.chainName)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Congelado:</span>
-                              <span>{formatBalance(balance.frozen)} DOT</span>
+                              <span>{formatBalance(balance.frozen, balance.chainName)}</span>
                             </div>
                             <div className="flex justify-between pt-2 border-t">
                               <span className="font-medium">Total:</span>
-                              <span className="font-bold">{formatBalance(balance.total)} DOT</span>
+                              <span className="font-bold">{formatBalance(balance.total, balance.chainName)}</span>
                             </div>
                             {balance.nonce !== undefined && (
                               <div className="flex justify-between text-xs text-muted-foreground pt-1">

@@ -151,7 +151,7 @@ export default function Onboarding() {
 
             {/* Diálogo para elegir método de importación */}
             <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogContent className="max-w-2xl max-h-[90vh] sm:max-h-[80vh] overflow-y-auto mx-4 sm:mx-0">
                 <DialogHeader>
                   <DialogTitle>¿Cómo deseas importar tu cuenta?</DialogTitle>
                   <DialogDescription>
@@ -221,7 +221,7 @@ export default function Onboarding() {
 
             {/* Diálogo para importar backup completo */}
             <Dialog open={showBackupDialog} onOpenChange={setShowBackupDialog}>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto mx-4 sm:mx-0">
                 <DialogHeader>
                   <DialogTitle>Importar Backup Completo</DialogTitle>
                   <DialogDescription>

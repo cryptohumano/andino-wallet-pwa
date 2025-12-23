@@ -199,5 +199,18 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Mejoras de scroll para móvil */
+  html {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Asegurar que el contenido no quede oculto detrás del BottomNav en móvil */
+  @media (max-width: 768px) {
+    body {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
 }
 

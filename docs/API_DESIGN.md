@@ -15,17 +15,17 @@ API RESTful diseñada para una PWA que funciona como wallet móvil con capacidad
 ┌─────────────────────────────────────────────────────────────┐
 │                    PWA (Cliente)                             │
 │  ┌───────────────────────────────────────────────────────┐   │
-│  │  Wallet Service                                        │   │
-│  │  - Keyring Management                                  │   │
+│  │  Wallet Service                                       │   │
+│  │  - Keyring Management                                 │   │
 │  │  - Document Generation (PDF)                          │   │
 │  │  - Cryptographic Operations                           │   │
 │  │  - Offline Storage (IndexedDB)                        │   │
 │  └───────────────────────────────────────────────────────┘   │
 │  ┌───────────────────────────────────────────────────────┐   │
-│  │  Service Worker                                        │   │
-│  │  - Background Sync                                     │   │
-│  │  - Request Queue                                       │   │
-│  │  - Cache Management                                    │   │
+│  │  Service Worker                                       │   │
+│  │  - Background Sync                                    │   │
+│  │  - Request Queue                                      │   │
+│  │  - Cache Management                                   │   │
 │  └───────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                         ↕ HTTPS / WebSocket

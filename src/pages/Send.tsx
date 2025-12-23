@@ -11,6 +11,8 @@ import { Send as SendIcon, Loader2, CheckCircle, XCircle, AlertCircle, Copy, Che
 import Identicon from '@polkadot/react-identicon'
 import { Avatar } from '@/components/ui/avatar'
 import type { TxStatus } from 'dedot/types'
+import { saveTransaction, updateTransactionStatus, type StoredTransaction } from '@/utils/transactionStorage'
+import { formatBalanceForDisplay } from '@/utils/balance'
 
 type TransactionType = 'transfer' | 'transferKeepAlive'
 
@@ -99,23 +101,77 @@ export default function Send() {
         ? client.tx.balances.transferKeepAlive(destAddress, amountBigInt)
         : client.tx.balances.transfer(destAddress, amountBigInt)
 
+      // Guardar transacción inicial (pending)
+      const storedTx: StoredTransaction = {
+        id: '', // Se establecerá cuando tengamos el hash
+        accountAddress: selectedAddress,
+        toAddress: destAddress,
+        amount: amountBigInt.toString(),
+        chain: selectedChain.name,
+        chainEndpoint: selectedChain.endpoint,
+        type: txType,
+        status: 'pending',
+        txHash: '', // Se establecerá cuando tengamos el hash
+        nonce: nonce ? parseInt(nonce, 10) : undefined,
+        tip: tip ? BigInt(tip).toString() : undefined,
+        fee: paymentInfo ? paymentInfo.partialFee.toString() : undefined,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }
+
       const result = await tx.signAndSend(
         account.pair,
         signerOptions,
-        (result) => {
+        async (result) => {
           const { status } = result
           setTxStatus(status)
           setTxHash(result.txHash)
           
-          if (status.type === 'BestChainBlockIncluded' || status.type === 'Finalized') {
-            if (status.type === 'Finalized') {
-              setFinalizedBlock({
-                blockHash: status.value.blockHash,
-                blockNumber: status.value.blockNumber,
-              })
+          // Actualizar transacción guardada
+          if (result.txHash && storedTx.id === '') {
+            storedTx.id = result.txHash
+            storedTx.txHash = result.txHash
+            try {
+              await saveTransaction(storedTx)
+            } catch (err) {
+              console.error('Error al guardar transacción inicial:', err)
             }
-          } else if (status.type === 'Invalid' || status.type === 'Drop') {
+          }
+          
+          // Actualizar estado de la transacción
+          let newStatus: StoredTransaction['status'] = 'pending'
+          if (status.type === 'BestChainBlockIncluded') {
+            newStatus = 'inBlock'
+          } else if (status.type === 'Finalized') {
+            newStatus = 'finalized'
+            setFinalizedBlock({
+              blockHash: status.value.blockHash,
+              blockNumber: status.value.blockNumber,
+            })
+          } else if (status.type === 'Invalid') {
+            newStatus = 'invalid'
             setError(status.value.error)
+          } else if (status.type === 'Drop') {
+            newStatus = 'dropped'
+            setError('Transacción descartada')
+          }
+
+          if (result.txHash && newStatus !== 'pending') {
+            try {
+              await updateTransactionStatus(
+                result.txHash,
+                newStatus,
+                status.type === 'Finalized' || status.type === 'BestChainBlockIncluded' 
+                  ? status.value.blockHash 
+                  : undefined,
+                status.type === 'Finalized' || status.type === 'BestChainBlockIncluded' 
+                  ? status.value.blockNumber 
+                  : undefined,
+                status.type === 'Invalid' ? status.value.error : undefined
+              )
+            } catch (err) {
+              console.error('Error al actualizar estado de transacción:', err)
+            }
           }
         }
       ).untilFinalized()
@@ -126,6 +182,24 @@ export default function Send() {
         blockNumber: result.status.value.blockNumber,
       })
       setTxStatus(result.status)
+
+      // Guardar/actualizar transacción finalizada
+      if (result.txHash) {
+        storedTx.id = result.txHash
+        storedTx.txHash = result.txHash
+        storedTx.status = 'finalized'
+        storedTx.blockHash = result.status.value.blockHash
+        storedTx.blockNumber = result.status.value.blockNumber
+        storedTx.finalizedAt = Date.now()
+        storedTx.updatedAt = Date.now()
+        
+        try {
+          await saveTransaction(storedTx)
+          console.log('[Send] ✅ Transacción guardada en IndexedDB:', result.txHash)
+        } catch (err) {
+          console.error('[Send] ❌ Error al guardar transacción finalizada:', err)
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Error al enviar la transacción')
     } finally {

@@ -227,7 +227,7 @@ export function DatabaseManager() {
                 Eliminar Todos los Datos
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto mx-4 sm:mx-0">
               <DialogHeader>
                 <DialogTitle className="text-destructive">Confirmar Eliminación</DialogTitle>
                 <DialogDescription>

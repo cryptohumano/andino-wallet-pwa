@@ -260,7 +260,7 @@ export function RuntimeApisExplorer({ client }: RuntimeApisExplorerProps) {
           Runtime APIs
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[95vh] sm:max-h-[80vh] overflow-hidden flex flex-col mx-4 sm:mx-0">
         <DialogHeader>
           <DialogTitle>Explorador de Runtime APIs</DialogTitle>
           <DialogDescription>

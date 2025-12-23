@@ -196,7 +196,7 @@ export default function Contacts() {
               Agregar Contacto
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto mx-4 sm:mx-0">
             <DialogHeader>
               <DialogTitle>
                 {editingContact ? 'Editar Contacto' : 'Nuevo Contacto'}

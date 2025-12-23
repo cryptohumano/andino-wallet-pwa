@@ -65,12 +65,26 @@ export async function saveEncryptedAccount(account: EncryptedAccount): Promise<v
     const request = store.put(accountToSave)
 
     request.onsuccess = () => {
-      console.log(`[IndexedDB] ✅ Cuenta guardada: ${accountToSave.address}`)
-      resolve()
+      console.log(`[IndexedDB] ✅ Request de guardado exitoso para: ${accountToSave.address}`)
+      // Esperar a que la transacción se complete antes de resolver
+      // Esto asegura que los datos estén realmente escritos en IndexedDB
     }
+    
     request.onerror = () => {
       console.error(`[IndexedDB] ❌ Error al guardar cuenta ${accountToSave.address}:`, request.error)
       reject(request.error)
+    }
+
+    // Esperar a que la transacción se complete
+    transaction.oncomplete = () => {
+      console.log(`[IndexedDB] ✅ Transacción completada - Cuenta guardada: ${accountToSave.address}`)
+      resolve()
+    }
+    
+    transaction.onerror = () => {
+      const error = transaction.error || request.error || new Error('Error en la transacción')
+      console.error(`[IndexedDB] ❌ Error en transacción al guardar cuenta ${accountToSave.address}:`, error)
+      reject(error)
     }
   })
 }

@@ -12,6 +12,8 @@ import TransactionDetail from '@/pages/TransactionDetail'
 import Networks from '@/pages/Networks'
 import Contacts from '@/pages/Contacts'
 import Documents from '@/pages/Documents'
+import DocumentDetail from '@/pages/DocumentDetail'
+import DocumentEditor from '@/pages/DocumentEditor'
 import FlightLogs from '@/pages/FlightLogs'
 import MedicalRecords from '@/pages/MedicalRecords'
 import Attestations from '@/pages/Attestations'
@@ -79,7 +81,24 @@ export const router = createBrowserRouter([
       },
       {
         path: 'documents',
-        element: <Documents />,
+        children: [
+          {
+            index: true,
+            element: <Documents />,
+          },
+          {
+            path: 'new',
+            element: <DocumentEditor />,
+          },
+          {
+            path: ':documentId',
+            element: <DocumentDetail />,
+          },
+          {
+            path: ':documentId/edit',
+            element: <DocumentEditor />,
+          },
+        ],
       },
       {
         path: 'flight-logs',

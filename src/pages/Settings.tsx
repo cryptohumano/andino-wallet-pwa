@@ -224,7 +224,7 @@ export default function Settings() {
                       Agregar API
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-2xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto mx-4 sm:mx-0">
                     <DialogHeader>
                       <DialogTitle>
                         {editingConfig ? 'Editar API' : 'Nueva API'}
