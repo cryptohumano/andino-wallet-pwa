@@ -41,8 +41,25 @@ function getLocalIP(): string {
 
 const LOCAL_IP = getLocalIP()
 
+// Detectar si estamos en GitHub Pages
+// Si el repositorio no es username.github.io, necesitamos el base path
+const getBase = () => {
+  // En desarrollo, no usar base
+  if (process.env.NODE_ENV === 'development') {
+    return '/'
+  }
+  // En producción, usar el nombre del repositorio como base si existe
+  const repoName = process.env.VITE_BASE_URL || process.env.GITHUB_REPOSITORY?.split('/')[1]
+  // Si el repo es username.github.io, usar /, sino usar /repo-name/
+  if (repoName && !repoName.includes('.github.io')) {
+    return `/${repoName}/`
+  }
+  return '/'
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  base: getBase(),
   server: {
     host: '0.0.0.0', // Permitir acceso desde la red local
     port: 5173,
@@ -64,8 +81,8 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'any',
-        start_url: '/',
-        scope: '/',
+        start_url: getBase(),
+        scope: getBase(),
         categories: ['finance', 'utilities', 'productivity'],
         lang: 'es',
         dir: 'ltr',

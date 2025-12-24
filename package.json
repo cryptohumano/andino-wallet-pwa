@@ -11,6 +11,7 @@
     "setup:ssh": "bash scripts/setup-ssh-key.sh",
     "create:icons": "bash scripts/create-icons.sh",
     "build": "tsc && vite build",
+    "build:gh-pages": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint ."
   },
