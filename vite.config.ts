@@ -45,7 +45,7 @@ const LOCAL_IP = getLocalIP()
 // Si el repositorio no es username.github.io, necesitamos el base path
 const getBase = () => {
   // En desarrollo, no usar base
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development' || !process.env.GITHUB_REPOSITORY) {
     return '/'
   }
   // En producción, usar el nombre del repositorio como base si existe
@@ -73,6 +73,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      base: getBase(),
+      scope: getBase(),
+      filename: 'manifest.webmanifest',
       manifest: {
         name: 'Aura Wallet',
         short_name: 'Aura Wallet',
@@ -82,7 +85,6 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'any',
         start_url: getBase(),
-        scope: getBase(),
         categories: ['finance', 'utilities', 'productivity'],
         lang: 'es',
         dir: 'ltr',
@@ -112,28 +114,28 @@ export default defineConfig({
             name: 'Inicio',
             short_name: 'Inicio',
             description: 'Ver resumen de cuentas y balances',
-            url: '/',
+            url: getBase(),
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           },
           {
             name: 'Enviar',
             short_name: 'Enviar',
             description: 'Enviar tokens a otra dirección',
-            url: '/send',
+            url: getBase() + 'send',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           },
           {
             name: 'Cuentas',
             short_name: 'Cuentas',
             description: 'Gestionar cuentas del wallet',
-            url: '/accounts',
+            url: getBase() + 'accounts',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           },
           {
             name: 'Identidad',
             short_name: 'Identidad',
             description: 'Gestionar identidad y privacidad',
-            url: '/identity',
+            url: getBase() + 'identity',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           }
         ]
@@ -144,7 +146,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        navigateFallback: '/index.html',
+        navigateFallback: getBase() === '/' ? '/index.html' : getBase() + 'index.html',
         navigateFallbackDenylist: [/^\/_/, /\/[^/?]+\.[^/]+$/],
         runtimeCaching: [
           {
