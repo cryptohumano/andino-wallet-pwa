@@ -44,12 +44,18 @@ const LOCAL_IP = getLocalIP()
 // Detectar si estamos en GitHub Pages
 // Si el repositorio no es username.github.io, necesitamos el base path
 const getBase = () => {
+  // Si hay una variable de entorno VITE_BASE_URL, usarla (útil para testing)
+  if (process.env.VITE_BASE_URL) {
+    return process.env.VITE_BASE_URL
+  }
+  
   // En desarrollo, no usar base
-  if (process.env.NODE_ENV === 'development' || !process.env.GITHUB_REPOSITORY) {
+  if (process.env.NODE_ENV === 'development') {
     return '/'
   }
-  // En producción, usar el nombre del repositorio como base si existe
-  const repoName = process.env.VITE_BASE_URL || process.env.GITHUB_REPOSITORY?.split('/')[1]
+  
+  // En producción (build), usar el nombre del repositorio como base si existe
+  const repoName = process.env.GITHUB_REPOSITORY?.split('/')[1]
   // Si el repo es username.github.io, usar /, sino usar /repo-name/
   if (repoName && !repoName.includes('.github.io')) {
     return `/${repoName}/`
@@ -57,9 +63,19 @@ const getBase = () => {
   return '/'
 }
 
+// Calcular el base path una vez
+const basePath = getBase()
+
+// Log para debugging (solo en build)
+if (process.env.NODE_ENV === 'production') {
+  console.log('[Vite Config] Base path:', basePath)
+  console.log('[Vite Config] GITHUB_REPOSITORY:', process.env.GITHUB_REPOSITORY)
+  console.log('[Vite Config] NODE_ENV:', process.env.NODE_ENV)
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  base: getBase(),
+  base: basePath,
   server: {
     host: '0.0.0.0', // Permitir acceso desde la red local
     port: 5173,
@@ -114,28 +130,28 @@ export default defineConfig({
             name: 'Inicio',
             short_name: 'Inicio',
             description: 'Ver resumen de cuentas y balances',
-            url: getBase(),
+            url: basePath,
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           },
           {
             name: 'Enviar',
             short_name: 'Enviar',
             description: 'Enviar tokens a otra dirección',
-            url: getBase() + 'send',
+            url: basePath + 'send',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           },
           {
             name: 'Cuentas',
             short_name: 'Cuentas',
             description: 'Gestionar cuentas del wallet',
-            url: getBase() + 'accounts',
+            url: basePath + 'accounts',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           },
           {
             name: 'Identidad',
             short_name: 'Identidad',
             description: 'Gestionar identidad y privacidad',
-            url: getBase() + 'identity',
+            url: basePath + 'identity',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192' }]
           }
         ]
@@ -146,8 +162,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        navigateFallback: getBase() === '/' ? '/index.html' : getBase() + 'index.html',
+        navigateFallback: basePath === '/' ? '/index.html' : basePath + 'index.html',
         navigateFallbackDenylist: [/^\/_/, /\/[^/?]+\.[^/]+$/],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB (aumentado de 2 MB por defecto)
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*/,
