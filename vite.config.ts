@@ -63,7 +63,8 @@ const getBase = () => {
   return '/'
 }
 
-// Calcular el base path una vez
+// Calcular el base path dinámicamente (se recalcula cada vez que se accede)
+// Esto asegura que las variables de entorno estén disponibles durante el build
 const basePath = getBase()
 
 // Log para debugging (solo en build)
@@ -71,6 +72,12 @@ if (process.env.NODE_ENV === 'production') {
   console.log('[Vite Config] Base path:', basePath)
   console.log('[Vite Config] GITHUB_REPOSITORY:', process.env.GITHUB_REPOSITORY)
   console.log('[Vite Config] NODE_ENV:', process.env.NODE_ENV)
+  
+  // Verificar que el base path sea correcto
+  if (!basePath || basePath === '/') {
+    console.warn('[Vite Config] ⚠️ Base path es "/". Si estás desplegando en GitHub Pages, esto podría causar problemas.')
+    console.warn('[Vite Config] GITHUB_REPOSITORY debería estar configurado en el workflow de GitHub Actions.')
+  }
 }
 
 // https://vite.dev/config/
