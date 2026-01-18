@@ -74,6 +74,8 @@ export default function MountainLogDetail() {
   const [isMobile, setIsMobile] = useState(false)
   const [showCameraDialog, setShowCameraDialog] = useState(false)
   const [currentMilestoneForImage, setCurrentMilestoneForImage] = useState<string | null>(null)
+  // Estado para mantener milestoneId durante el proceso de captura (iOS puede perder el atributo)
+  const milestoneIdForCapture = useRef<string | null>(null)
 
   // Detectar si es dispositivo móvil
   useEffect(() => {
@@ -489,10 +491,15 @@ export default function MountainLogDetail() {
     if (!log) return
     setCurrentMilestoneForImage(milestoneId)
     
+    // Guardar milestoneId en ref para iOS (puede perder el atributo)
+    milestoneIdForCapture.current = milestoneId
+    console.log('[handleAddImageToMilestone] Milestone ID guardado:', milestoneId)
+    
     // En móvil, usar input file con capture
     // En desktop, ofrecer opción de webcam o archivo
     if (isMobile) {
       cameraInputRef.current?.setAttribute('data-milestone-id', milestoneId)
+      console.log('[handleAddImageToMilestone] Abriendo cámara en móvil...')
       cameraInputRef.current?.click()
     } else {
       // En desktop, mostrar opción de webcam o archivo
@@ -625,101 +632,274 @@ export default function MountainLogDetail() {
   }
 
   const handleImageFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!log) return
+    if (!log) {
+      console.error('[handleImageFile] No hay log disponible')
+      toast.error('Error: No hay bitácora disponible')
+      return
+    }
 
     const files = event.target.files
-    if (!files || files.length === 0) return
+    if (!files || files.length === 0) {
+      console.warn('[handleImageFile] No se seleccionaron archivos')
+      return
+    }
 
     const file = files[0]
+    console.log('[handleImageFile] Archivo seleccionado:', {
+      name: file.name,
+      type: file.type,
+      size: file.size
+    })
+
     if (!file.type.startsWith('image/')) {
       toast.error('El archivo debe ser una imagen')
       return
     }
 
-    const milestoneId = cameraInputRef.current?.getAttribute('data-milestone-id')
+    // Obtener milestoneId ANTES de procesar (iOS puede limpiar el input)
+    // Intentar desde el atributo primero, luego desde el ref
+    let milestoneId = cameraInputRef.current?.getAttribute('data-milestone-id') || milestoneIdForCapture.current
+    console.log('[handleImageFile] Milestone ID (atributo):', cameraInputRef.current?.getAttribute('data-milestone-id'))
+    console.log('[handleImageFile] Milestone ID (ref):', milestoneIdForCapture.current)
+    console.log('[handleImageFile] Milestone ID (final):', milestoneId)
+
+    if (!milestoneId) {
+      console.error('[handleImageFile] No se encontró milestoneId')
+      toast.error('Error: No se pudo identificar el milestone. Intenta de nuevo.')
+      // Limpiar input
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = ''
+      }
+      return
+    }
+
+    // Verificar que el milestone existe
+    const milestone = log.milestones.find(m => m.id === milestoneId)
+    if (!milestone) {
+      console.error('[handleImageFile] Milestone no encontrado:', milestoneId)
+      toast.error('Error: Milestone no encontrado')
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = ''
+      }
+      return
+    }
 
     try {
       const reader = new FileReader()
-      reader.onload = async (e) => {
-        const dataUrl = e.target?.result as string
-        if (!dataUrl) return
-
-        let gpsMetadata: GPSMetadata | undefined
-        if (currentLocation) {
-          gpsMetadata = {
-            latitude: currentLocation.latitude,
-            longitude: currentLocation.longitude,
-            altitude: currentLocation.altitude,
-            accuracy: currentLocation.accuracy,
-            timestamp: Date.now()
-          }
+      
+      reader.onerror = (error) => {
+        console.error('[handleImageFile] Error en FileReader:', error)
+        toast.error('Error al leer la imagen')
+        if (cameraInputRef.current) {
+          cameraInputRef.current.value = ''
         }
-
-        const img = new Image()
-        img.onload = async () => {
-          const canvas = document.createElement('canvas')
-          const maxSize = 200
-          let width = img.width
-          let height = img.height
-
-          if (width > height) {
-            if (width > maxSize) {
-              height = (height * maxSize) / width
-              width = maxSize
-            }
-          } else {
-            if (height > maxSize) {
-              width = (width * maxSize) / height
-              height = maxSize
-            }
-          }
-
-          canvas.width = width
-          canvas.height = height
-          const ctx = canvas.getContext('2d')
-          ctx?.drawImage(img, 0, 0, width, height)
-          const thumbnail = canvas.toDataURL('image/jpeg', 0.7)
-
-          const image: MountainLogImage = {
-            id: uuidv4(),
-            data: dataUrl,
-            thumbnail,
-            metadata: {
-              filename: file.name,
-              mimeType: file.type,
-              size: file.size,
-              width: img.width,
-              height: img.height,
-              capturedAt: Date.now(),
-              gpsMetadata
-            }
-          }
-
-          const updatedLog: MountainLog = {
-            ...log,
-            milestones: log.milestones.map(m => 
-              m.id === milestoneId 
-                ? { ...m, images: [...m.images, image] }
-                : m
-            ),
-            updatedAt: Date.now()
-          }
-
-          await saveMountainLog(updatedLog)
-          setLog(updatedLog)
-          toast.success('Imagen agregada')
-        }
-        img.src = dataUrl
       }
+
+          reader.onload = async (e) => {
+        try {
+          // Verificar que el componente aún esté montado
+          if (!log || !milestoneId) {
+            console.error('[handleImageFile] Log o milestoneId no disponible en reader.onload')
+            toast.error('Error: La bitácora ya no está disponible')
+            return
+          }
+
+          const dataUrl = e.target?.result as string
+          if (!dataUrl) {
+            console.error('[handleImageFile] No se pudo obtener dataUrl')
+            toast.error('Error al procesar la imagen')
+            return
+          }
+
+          console.log('[handleImageFile] Imagen leída, tamaño dataUrl:', dataUrl.length)
+
+          let gpsMetadata: GPSMetadata | undefined
+          if (currentLocation) {
+            gpsMetadata = {
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
+              altitude: currentLocation.altitude,
+              accuracy: currentLocation.accuracy,
+              timestamp: Date.now()
+            }
+            console.log('[handleImageFile] GPS metadata agregado:', gpsMetadata)
+          }
+
+          // Verificar que Image esté disponible
+          if (typeof Image === 'undefined') {
+            console.error('[handleImageFile] Image constructor no está disponible')
+            toast.error('Error: No se puede procesar la imagen')
+            return
+          }
+
+          const img = new Image()
+          
+          // Configurar handlers ANTES de asignar src
+          img.onerror = (error) => {
+            console.error('[handleImageFile] Error al cargar imagen:', error)
+            toast.error('Error al procesar la imagen')
+            milestoneIdForCapture.current = null
+          }
+
+          // Timeout de seguridad para iOS
+          let timeoutId: NodeJS.Timeout | null = null
+          
+          img.onload = async () => {
+            // Limpiar timeout si existe
+            if (timeoutId) {
+              clearTimeout(timeoutId)
+              timeoutId = null
+            }
+            try {
+              console.log('[handleImageFile] Imagen cargada, dimensiones:', img.width, 'x', img.height)
+
+              // Verificar que document esté disponible (iOS puede tener problemas)
+              if (typeof document === 'undefined' || document === null) {
+                console.error('[handleImageFile] document no está disponible')
+                toast.error('Error: No se puede procesar la imagen en este momento')
+                return
+              }
+
+              // Verificar que el componente aún esté montado y el log exista
+              if (!log || !milestoneId) {
+                console.error('[handleImageFile] Log o milestoneId no disponible en img.onload')
+                toast.error('Error: La bitácora ya no está disponible')
+                return
+              }
+
+              const canvas = document.createElement('canvas')
+              const maxSize = 200
+              let width = img.width
+              let height = img.height
+
+              if (width > height) {
+                if (width > maxSize) {
+                  height = (height * maxSize) / width
+                  width = maxSize
+                }
+              } else {
+                if (height > maxSize) {
+                  width = (width * maxSize) / height
+                  height = maxSize
+                }
+              }
+
+              canvas.width = width
+              canvas.height = height
+              const ctx = canvas.getContext('2d')
+              if (!ctx) {
+                throw new Error('No se pudo obtener contexto del canvas')
+              }
+
+              ctx.drawImage(img, 0, 0, width, height)
+              const thumbnail = canvas.toDataURL('image/jpeg', 0.7)
+              console.log('[handleImageFile] Thumbnail generado')
+
+              const image: MountainLogImage = {
+                id: uuidv4(),
+                data: dataUrl,
+                thumbnail,
+                metadata: {
+                  filename: file.name || `foto-${Date.now()}.jpg`,
+                  mimeType: file.type || 'image/jpeg',
+                  size: file.size,
+                  width: img.width,
+                  height: img.height,
+                  capturedAt: Date.now(),
+                  gpsMetadata
+                }
+              }
+
+              console.log('[handleImageFile] Creando imagen, milestoneId:', milestoneId)
+              console.log('[handleImageFile] Milestones actuales:', log.milestones.length)
+
+              const updatedLog: MountainLog = {
+                ...log,
+                milestones: log.milestones.map(m => {
+                  if (m.id === milestoneId) {
+                    console.log('[handleImageFile] Agregando imagen al milestone:', m.id, 'Imágenes actuales:', m.images.length)
+                    return { ...m, images: [...m.images, image] }
+                  }
+                  return m
+                }),
+                updatedAt: Date.now()
+              }
+
+              // Verificar una vez más antes de guardar
+              if (!log || !milestoneId) {
+                console.error('[handleImageFile] Log o milestoneId perdido antes de guardar')
+                toast.error('Error: La bitácora ya no está disponible')
+                return
+              }
+
+              console.log('[handleImageFile] Guardando bitácora actualizada...')
+              try {
+                await saveMountainLog(updatedLog)
+                console.log('[handleImageFile] Bitácora guardada exitosamente')
+                
+                // Verificar que el componente aún esté montado antes de actualizar estado
+                setLog(prevLog => {
+                  if (!prevLog) {
+                    console.warn('[handleImageFile] Componente desmontado, no se actualiza estado')
+                    return prevLog
+                  }
+                  return updatedLog
+                })
+                
+                toast.success('Imagen agregada exitosamente')
+                
+                // Limpiar milestoneId después de éxito
+                milestoneIdForCapture.current = null
+                
+                // Verificar que se guardó correctamente
+                const savedMilestone = updatedLog.milestones.find(m => m.id === milestoneId)
+                if (savedMilestone) {
+                  console.log('[handleImageFile] ✅ Imagen agregada. Total de imágenes en milestone:', savedMilestone.images.length)
+                } else {
+                  console.error('[handleImageFile] ❌ Milestone no encontrado después de guardar')
+                }
+              } catch (saveError) {
+                console.error('[handleImageFile] Error al guardar:', saveError)
+                toast.error('Error al guardar la imagen: ' + (saveError instanceof Error ? saveError.message : 'Error desconocido'))
+                throw saveError
+              }
+            } catch (error) {
+              console.error('[handleImageFile] Error en img.onload:', error)
+              toast.error('Error al procesar la imagen: ' + (error instanceof Error ? error.message : 'Error desconocido'))
+            }
+          }
+
+          // Asignar src después de configurar handlers
+          img.src = dataUrl
+          
+          // Timeout de seguridad para iOS (10 segundos)
+          timeoutId = setTimeout(() => {
+            if (!img.complete) {
+              console.error('[handleImageFile] Timeout al cargar imagen después de 10s')
+              toast.error('La imagen tardó demasiado en cargar. Intenta con otra foto.')
+              img.onerror = null
+              img.onload = null
+              milestoneIdForCapture.current = null
+            }
+          }, 10000)
+        } catch (error) {
+          console.error('[handleImageFile] Error en reader.onload:', error)
+          toast.error('Error al procesar la imagen: ' + (error instanceof Error ? error.message : 'Error desconocido'))
+          milestoneIdForCapture.current = null
+        }
+      }
+
+      console.log('[handleImageFile] Iniciando lectura del archivo...')
       reader.readAsDataURL(file)
     } catch (error) {
-      console.error('Error al procesar imagen:', error)
-      toast.error('Error al procesar la imagen')
-    }
-
-    if (cameraInputRef.current) {
-      cameraInputRef.current.value = ''
-      cameraInputRef.current.removeAttribute('data-milestone-id')
+      console.error('[handleImageFile] Error general:', error)
+      toast.error('Error al procesar la imagen: ' + (error instanceof Error ? error.message : 'Error desconocido'))
+    } finally {
+      // Limpiar input después de procesar
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = ''
+        // NO remover el data-milestone-id aquí todavía, se limpiará después de éxito
+      }
     }
   }
 
