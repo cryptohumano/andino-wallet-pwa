@@ -231,7 +231,7 @@ export default function Identity() {
                       {identity.deposit && (
                         <Alert>
                           <AlertDescription>
-                            <strong>Depósito:</strong> {formatBalance(identity.deposit)} DOT
+                            <strong>Depósito:</strong> {formatBalance(identity.deposit, `people-${selectedNetwork}`)}
                           </AlertDescription>
                         </Alert>
                       )}

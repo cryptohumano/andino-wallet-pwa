@@ -3,9 +3,11 @@ import { DedotClient } from 'dedot'
 import { WsProvider } from 'dedot'
 
 // Endpoints de People Chain
+// Usando IBP (Infrastructure Builders' Programme) como principal
+// Referencia: https://wiki.ibp.network/docs/consumers/archives
 const PEOPLE_CHAIN_ENDPOINTS = {
-  polkadot: 'wss://polkadot-people-rpc.polkadot.io',
-  kusama: 'wss://kusama-people-rpc.polkadot.io',
+  polkadot: 'wss://sys.ibp.network/people-polkadot',
+  kusama: 'wss://sys.ibp.network/people-kusama',
   paseo: 'wss://sys.ibp.network/people-paseo',
 }
 
@@ -58,42 +60,116 @@ export function usePeopleChainIdentity(
       const client = await DedotClient.new(provider)
 
       try {
-        // Query de identidad usando el pallet identity
-        // Nota: La estructura exacta puede variar según la versión de People Chain
-        const identityData = await client.query.identity.identityOf(address)
-
-        if (identityData && identityData.value) {
-          const info = identityData.value.info || {}
-          const judgements = identityData.value.judgements || []
-          const deposit = identityData.value.deposit ? BigInt(identityData.value.deposit.toString()) : undefined
-
-          const identityInfo: IdentityInfo = {
-            display: info.display?.value,
-            legal: info.legal?.value,
-            web: info.web?.value,
-            riot: info.riot?.value,
-            email: info.email?.value,
-            twitter: info.twitter?.value,
-            additional: info.additional?.map((item: any) => ({
-              key: item[0]?.value || '',
-              value: item[1]?.value || '',
-            })),
-            judgements: judgements.map((j: any, index: number) => ({
-              index,
-              judgement: j[1]?.toString() || 'Unknown',
-            })),
-            deposit,
-          }
-
-          setIdentity(identityInfo)
-          setHasIdentity(true)
-        } else {
+        // Verificar que el pallet identity esté disponible
+        if (!client.query.identity) {
+          console.warn(`[Identity] ⚠️ El pallet 'identity' no está disponible en ${network}`)
+          console.log(`[Identity] Pallets disponibles:`, Object.keys(client.query))
+          setError(`El pallet 'identity' no está disponible en ${network}`)
           setIdentity(null)
           setHasIdentity(false)
+          await client.disconnect()
+          return
+        }
+
+        // Query de identidad usando el pallet identity
+        // Según la documentación de dedot: client.query.<pallet>.<storageEntry>
+        // Cuando no hay identidad, dedot devuelve null directamente
+        console.log(`[Identity] Consultando identidad para ${address} en ${network}...`)
+        console.log(`[Identity] Storage entries disponibles en identity:`, Object.keys(client.query.identity))
+        
+        const identityData = await client.query.identity.identityOf(address)
+        
+        console.log(`[Identity] Resultado de query:`, identityData)
+
+        // En dedot, cuando no hay datos, el storage query devuelve null
+        // Si hay datos, puede venir como objeto con estructura específica
+        if (identityData === null || identityData === undefined) {
+          console.log(`[Identity] No se encontró identidad para ${address} en ${network}`)
+          setIdentity(null)
+          setHasIdentity(false)
+        } else {
+          // La estructura puede variar, intentar diferentes formatos
+          let identityValue: any = null
+          
+          // Formato 1: identityData.value
+          if (identityData && typeof identityData === 'object' && 'value' in identityData) {
+            identityValue = identityData.value
+          }
+          // Formato 2: identityData directamente
+          else if (identityData && typeof identityData === 'object') {
+            identityValue = identityData
+          }
+
+          if (identityValue) {
+            const info = identityValue.info || {}
+            const judgements = identityValue.judgements || []
+            const deposit = identityValue.deposit ? BigInt(identityValue.deposit.toString()) : undefined
+
+            // En dedot, los campos opcionales pueden venir como Option<T>
+            // Necesitamos extraer el valor si es un Option
+            const extractValue = (field: any): string | undefined => {
+              if (!field) return undefined
+              // Si es un Option, extraer el value
+              if (typeof field === 'object' && 'value' in field) {
+                return field.value
+              }
+              // Si es un string directamente
+              if (typeof field === 'string') {
+                return field
+              }
+              return undefined
+            }
+
+            const identityInfo: IdentityInfo = {
+              display: extractValue(info.display),
+              legal: extractValue(info.legal),
+              web: extractValue(info.web),
+              riot: extractValue(info.riot),
+              email: extractValue(info.email),
+              twitter: extractValue(info.twitter),
+              additional: info.additional?.map((item: any) => {
+                // Los additional fields vienen como [key, value]
+                const key = Array.isArray(item) ? (item[0]?.value || item[0]) : item?.key
+                const value = Array.isArray(item) ? (item[1]?.value || item[1]) : item?.value
+                return {
+                  key: typeof key === 'string' ? key : '',
+                  value: typeof value === 'string' ? value : '',
+                }
+              }),
+              judgements: judgements.map((j: any, index: number) => {
+                // Los judgements vienen como tuplas [registrarIndex, judgement]
+                if (Array.isArray(j) && j.length >= 2) {
+                  return {
+                    index: typeof j[0] === 'number' ? j[0] : index,
+                    judgement: j[1]?.toString() || 'Unknown',
+                  }
+                }
+                return {
+                  index,
+                  judgement: j?.toString() || 'Unknown',
+                }
+              }),
+              deposit,
+            }
+
+            console.log(`[Identity] ✅ Identidad encontrada:`, identityInfo)
+            setIdentity(identityInfo)
+            setHasIdentity(true)
+          } else {
+            console.log(`[Identity] No se encontró identidad (valor vacío) para ${address} en ${network}`)
+            setIdentity(null)
+            setHasIdentity(false)
+          }
         }
       } catch (err: any) {
         // Si el pallet no existe o hay un error, asumimos que no hay identidad
-        console.warn(`Error querying identity from People Chain (${network}):`, err)
+        console.error(`[Identity] ❌ Error querying identity from People Chain (${network}):`, err)
+        console.error(`[Identity] Detalles del error:`, {
+          message: err.message,
+          stack: err.stack,
+          name: err.name,
+        })
+        setError(err.message || 'Error al consultar identidad')
         setIdentity(null)
         setHasIdentity(false)
       } finally {
@@ -149,32 +225,72 @@ export function useMultiPeopleChainIdentity(address: string | null) {
           const client = await DedotClient.new(provider)
 
           try {
+            console.log(`[Identity] Consultando identidad para ${address} en ${network}...`)
             const identityData = await client.query.identity.identityOf(address)
+            console.log(`[Identity] Resultado de query en ${network}:`, identityData)
 
-            if (identityData && identityData.value) {
-              const info = identityData.value.info || {}
-              results[network] = {
-                display: info.display?.value,
-                legal: info.legal?.value,
-                web: info.web?.value,
-                riot: info.riot?.value,
-                email: info.email?.value,
-                twitter: info.twitter?.value,
-                additional: info.additional?.map((item: any) => ({
-                  key: item[0]?.value || '',
-                  value: item[1]?.value || '',
-                })),
-                judgements: identityData.value.judgements?.map((j: any, index: number) => ({
-                  index,
-                  judgement: j[1]?.toString() || 'Unknown',
-                })),
-                deposit: identityData.value.deposit ? BigInt(identityData.value.deposit.toString()) : undefined,
-              }
-            } else {
+            if (identityData === null || identityData === undefined) {
               results[network] = null
+            } else {
+              // La estructura puede variar, intentar diferentes formatos
+              let identityValue: any = null
+              
+              if (identityData && typeof identityData === 'object' && 'value' in identityData) {
+                identityValue = identityData.value
+              } else if (identityData && typeof identityData === 'object') {
+                identityValue = identityData
+              }
+
+              if (identityValue) {
+                const info = identityValue.info || {}
+                const judgements = identityValue.judgements || []
+                
+                const extractValue = (field: any): string | undefined => {
+                  if (!field) return undefined
+                  if (typeof field === 'object' && 'value' in field) {
+                    return field.value
+                  }
+                  if (typeof field === 'string') {
+                    return field
+                  }
+                  return undefined
+                }
+
+                results[network] = {
+                  display: extractValue(info.display),
+                  legal: extractValue(info.legal),
+                  web: extractValue(info.web),
+                  riot: extractValue(info.riot),
+                  email: extractValue(info.email),
+                  twitter: extractValue(info.twitter),
+                  additional: info.additional?.map((item: any) => {
+                    const key = Array.isArray(item) ? (item[0]?.value || item[0]) : item?.key
+                    const value = Array.isArray(item) ? (item[1]?.value || item[1]) : item?.value
+                    return {
+                      key: typeof key === 'string' ? key : '',
+                      value: typeof value === 'string' ? value : '',
+                    }
+                  }),
+                  judgements: judgements.map((j: any, index: number) => {
+                    if (Array.isArray(j) && j.length >= 2) {
+                      return {
+                        index: typeof j[0] === 'number' ? j[0] : index,
+                        judgement: j[1]?.toString() || 'Unknown',
+                      }
+                    }
+                    return {
+                      index,
+                      judgement: j?.toString() || 'Unknown',
+                    }
+                  }),
+                  deposit: identityValue.deposit ? BigInt(identityValue.deposit.toString()) : undefined,
+                }
+              } else {
+                results[network] = null
+              }
             }
-          } catch (err) {
-            console.warn(`No identity found on ${network} People Chain`)
+          } catch (err: any) {
+            console.warn(`[Identity] No identity found on ${network} People Chain:`, err.message)
             results[network] = null
           } finally {
             await client.disconnect()

@@ -10,13 +10,13 @@ export interface ChainInfo {
 export const DEFAULT_CHAINS: ChainInfo[] = [
   {
     name: 'Polkadot',
-    endpoint: 'wss://rpc.polkadot.io',
-    description: 'Red principal de Polkadot'
+    endpoint: 'wss://rpc.ibp.network/polkadot',
+    description: 'Red principal de Polkadot (IBP)'
   },
   {
     name: 'Kusama',
-    endpoint: 'wss://kusama-rpc.polkadot.io',
-    description: 'Red canary de Polkadot'
+    endpoint: 'wss://rpc.ibp.network/kusama',
+    description: 'Red canary de Polkadot (IBP)'
   },
   {
     name: 'Paseo Relay Chain',
@@ -45,62 +45,177 @@ export const DEFAULT_CHAINS: ChainInfo[] = [
   },
   {
     name: 'Collectives (Paseo)',
-    endpoint: 'wss://collectives-paseo.dotters.network',
+    endpoint: 'wss://sys.ibp.network/collectives-paseo',
     description: 'Collectives Chain de Paseo - Gobernanza y colectivos'
   },
   {
     name: 'Asset Hub (Polkadot)',
-    endpoint: 'wss://polkadot-asset-hub-rpc.polkadot.io',
-    description: 'Asset Hub de Polkadot - Gestión de activos y NFTs'
+    endpoint: 'wss://sys.ibp.network/asset-hub-polkadot',
+    description: 'Asset Hub de Polkadot - Gestión de activos y NFTs (IBP)'
   },
   {
     name: 'Asset Hub (Kusama)',
-    endpoint: 'wss://kusama-asset-hub-rpc.polkadot.io',
-    description: 'Asset Hub de Kusama - Gestión de activos y NFTs'
+    endpoint: 'wss://sys.ibp.network/asset-hub-kusama',
+    description: 'Asset Hub de Kusama - Gestión de activos y NFTs (IBP)'
   },
   {
     name: 'People Chain (Polkadot)',
-    endpoint: 'wss://polkadot-people-rpc.polkadot.io',
-    description: 'People Chain de Polkadot - Sistema de identidad'
+    endpoint: 'wss://sys.ibp.network/people-polkadot',
+    description: 'People Chain de Polkadot - Sistema de identidad (IBP)'
   },
   {
     name: 'People Chain (Kusama)',
-    endpoint: 'wss://kusama-people-rpc.polkadot.io',
-    description: 'People Chain de Kusama - Sistema de identidad'
+    endpoint: 'wss://sys.ibp.network/people-kusama',
+    description: 'People Chain de Kusama - Sistema de identidad (IBP)'
+  },
+  {
+    name: 'Bridge Hub (Polkadot)',
+    endpoint: 'wss://sys.ibp.network/bridgehub-polkadot',
+    description: 'Bridge Hub de Polkadot - Puentes entre cadenas (IBP)'
+  },
+  {
+    name: 'Coretime (Polkadot)',
+    endpoint: 'wss://sys.ibp.network/coretime-polkadot',
+    description: 'Coretime Chain de Polkadot - Gestión de coretime (IBP)'
+  },
+  {
+    name: 'Collectives (Polkadot)',
+    endpoint: 'wss://sys.ibp.network/collectives-polkadot',
+    description: 'Collectives Chain de Polkadot - Gobernanza y colectivos (IBP)'
   }
 ]
+
+// Endpoints alternativos para cadenas conocidas
+// Usando IBP (Infrastructure Builders' Programme) como principal y dotters.network como fallback
+// Referencia: https://wiki.ibp.network/docs/consumers/archives
+const FALLBACK_ENDPOINTS: Record<string, string[]> = {
+  // Polkadot Relay Chain
+  'wss://rpc.ibp.network/polkadot': [
+    'wss://polkadot.dotters.network',
+    'wss://rpc.polkadot.io',
+  ],
+  // Kusama Relay Chain
+  'wss://rpc.ibp.network/kusama': [
+    'wss://kusama.dotters.network',
+    'wss://kusama-rpc.polkadot.io',
+  ],
+  // Asset Hub (Polkadot)
+  'wss://sys.ibp.network/asset-hub-polkadot': [
+    'wss://asset-hub-polkadot.dotters.network',
+    'wss://polkadot-asset-hub-rpc.polkadot.io',
+    'wss://statemint-rpc.polkadot.io',
+  ],
+  // Asset Hub (Kusama)
+  'wss://sys.ibp.network/asset-hub-kusama': [
+    'wss://asset-hub-kusama.dotters.network',
+    'wss://kusama-asset-hub-rpc.polkadot.io',
+    'wss://statemine-rpc.polkadot.io',
+  ],
+  // People Chain (Polkadot)
+  'wss://sys.ibp.network/people-polkadot': [
+    'wss://people-polkadot.dotters.network',
+    'wss://polkadot-people-rpc.polkadot.io',
+  ],
+  // People Chain (Kusama)
+  'wss://sys.ibp.network/people-kusama': [
+    'wss://people-kusama.dotters.network',
+    'wss://kusama-people-rpc.polkadot.io',
+  ],
+  // Bridge Hub (Polkadot)
+  'wss://sys.ibp.network/bridgehub-polkadot': [
+    'wss://bridge-hub-polkadot.dotters.network',
+  ],
+  // Coretime (Polkadot)
+  'wss://sys.ibp.network/coretime-polkadot': [
+    'wss://coretime-polkadot.dotters.network',
+  ],
+  // Collectives (Polkadot)
+  'wss://sys.ibp.network/collectives-polkadot': [
+    'wss://collectives-polkadot.dotters.network',
+  ],
+  // Paseo Relay Chain
+  'wss://rpc.ibp.network/paseo': [
+    'wss://paseo.dotters.network',
+  ],
+  // Asset Hub (Paseo)
+  'wss://sys.ibp.network/asset-hub-paseo': [
+    'wss://asset-hub-paseo.dotters.network',
+  ],
+  // Bridge Hub (Paseo)
+  'wss://sys.ibp.network/bridgehub-paseo': [
+    'wss://bridge-hub-paseo.dotters.network',
+  ],
+  // Coretime (Paseo)
+  'wss://sys.ibp.network/coretime-paseo': [
+    'wss://coretime-paseo.dotters.network',
+  ],
+  // People (Paseo)
+  'wss://sys.ibp.network/people-paseo': [
+    'wss://people-paseo.dotters.network',
+  ],
+  // Collectives (Paseo)
+  'wss://sys.ibp.network/collectives-paseo': [
+    'wss://collectives-paseo.dotters.network',
+  ],
+}
+
+async function tryConnectWithFallback(
+  primaryEndpoint: string,
+  fallbacks: string[] = []
+): Promise<{ client: DedotClient; endpoint: string }> {
+  const allEndpoints = [primaryEndpoint, ...fallbacks]
+  let lastError: Error | null = null
+
+  for (const endpoint of allEndpoints) {
+    try {
+      const provider = new WsProvider(endpoint)
+      await provider.connect()
+      const client = await DedotClient.new(provider)
+      console.log(`[DedotClient] ✅ Conectado a ${endpoint}`)
+      return { client, endpoint }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      console.warn(`[DedotClient] ⚠️ Error al conectar a ${endpoint}:`, lastError.message)
+      // Continuar con el siguiente endpoint
+    }
+  }
+
+  throw lastError || new Error('No se pudo conectar a ningún endpoint')
+}
 
 export function useDedotClient(endpoint: string | null) {
   const [client, setClient] = useState<DedotClient | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [connectedEndpoint, setConnectedEndpoint] = useState<string | null>(null)
 
   useEffect(() => {
     if (!endpoint) {
       setClient(null)
+      setConnectedEndpoint(null)
       return
     }
 
     setIsConnecting(true)
     setError(null)
 
-    const provider = new WsProvider(endpoint)
+    const fallbacks = FALLBACK_ENDPOINTS[endpoint] || []
     let newClient: DedotClient | null = null
 
-    // Conectar el provider primero, luego crear el cliente
-    provider.connect()
-      .then(() => {
-        return DedotClient.new(provider)
-      })
-      .then((client) => {
-        newClient = client
-        setClient(client)
+    tryConnectWithFallback(endpoint, fallbacks)
+      .then(({ client: connectedClient, endpoint: connectedEndpoint }) => {
+        newClient = connectedClient
+        setClient(connectedClient)
+        setConnectedEndpoint(connectedEndpoint)
         setIsConnecting(false)
       })
       .catch((err) => {
-        setError(err.message || 'Error al conectar')
+        const errorMessage = err.message || 'Error al conectar'
+        setError(errorMessage)
         setIsConnecting(false)
         setClient(null)
+        setConnectedEndpoint(null)
+        console.error(`[DedotClient] ❌ Error al conectar a ${endpoint}:`, errorMessage)
       })
 
     return () => {
@@ -110,6 +225,6 @@ export function useDedotClient(endpoint: string | null) {
     }
   }, [endpoint])
 
-  return { client, isConnecting, error }
+  return { client, isConnecting, error, connectedEndpoint }
 }
 

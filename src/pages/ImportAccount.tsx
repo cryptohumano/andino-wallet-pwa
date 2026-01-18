@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useKeyringContext } from '@/contexts/KeyringContext'
-import { AlertCircle, CheckCircle, Copy, Eye, EyeOff, Key, FileText } from 'lucide-react'
+import { AlertCircle, CheckCircle, Copy, Eye, EyeOff, Key, FileText, Users } from 'lucide-react'
+import { decryptPolkadotJsBackup, isPolkadotJsBackup } from '@/utils/polkadotJsBackup'
 
 type CryptoType = 'sr25519' | 'ed25519' | 'ecdsa'
 type ImportMethod = 'mnemonic' | 'uri' | 'json'
@@ -42,6 +44,11 @@ export default function ImportAccount() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [importedAddress, setImportedAddress] = useState<string | null>(null)
+  
+  // Estado para backup completo de Polkadot.js
+  const [backupAccounts, setBackupAccounts] = useState<Array<{ address: string; json: any; meta: any }>>([])
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set())
+  const [showAccountSelection, setShowAccountSelection] = useState(false)
 
   // Validar mnemonic (12 o 24 palabras)
   const validateMnemonic = (mnemonic: string): boolean => {
@@ -140,14 +147,46 @@ export default function ImportAccount() {
             }
 
             // Verificar si es un archivo de backup de Aura Wallet
-            if (parsed.version && parsed.accounts && Array.isArray(parsed.accounts)) {
+            if (parsed.version && parsed.accounts && Array.isArray(parsed.accounts) && !parsed.encoded) {
               // Es un archivo de backup completo de Aura Wallet
               setError('Este es un archivo de backup completo de Aura Wallet. Por favor, usa la opción "Importar Backup Completo" desde la pantalla de inicio (onboarding) o desde Configuración > Seguridad > Backup e Importación.')
               setLoading(false)
               return
             }
 
-            // Verificar si es un JSON de Polkadot.js (tiene 'address' y 'encoded')
+            // Verificar si es un backup completo de Polkadot.js (tiene 'encoded' y 'accounts' array)
+            if (isPolkadotJsBackup(parsed)) {
+              // Es un backup completo de Polkadot.js con múltiples cuentas
+              if (!jsonPassword) {
+                setError('Se requiere la contraseña del archivo JSON de Polkadot.js para desencriptar el backup completo')
+                setLoading(false)
+                return
+              }
+
+              try {
+                // Desencriptar el backup completo
+                const accounts = await decryptPolkadotJsBackup(parsed, jsonPassword)
+                
+                if (accounts.length === 0) {
+                  setError('No se encontraron cuentas en el backup')
+                  setLoading(false)
+                  return
+                }
+                
+                // Mostrar UI de selección de cuentas
+                setBackupAccounts(accounts)
+                setSelectedAccounts(new Set(accounts.map(acc => acc.address)))
+                setShowAccountSelection(true)
+                setLoading(false)
+                return
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Error al desencriptar el backup de Polkadot.js')
+                setLoading(false)
+                return
+              }
+            }
+
+            // Verificar si es un JSON de Polkadot.js individual (tiene 'address' y 'encoded')
             if (parsed.address && parsed.encoded) {
               // Es un JSON de Polkadot.js
               if (!jsonPassword) {
@@ -241,6 +280,121 @@ export default function ImportAccount() {
     }
   }
 
+  const handleImportSelectedAccounts = async () => {
+    if (selectedAccounts.size === 0) {
+      setError('Por favor selecciona al menos una cuenta para importar')
+      return
+    }
+
+    if (!jsonPassword) {
+      setError('Se requiere la contraseña del archivo JSON de Polkadot.js')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setSuccess(false)
+
+    try {
+      // Si no está desbloqueado y hay contraseña, intentar desbloquear primero
+      if (!isUnlocked && password) {
+        const unlocked = await unlock(password)
+        if (!unlocked) {
+          setError('Error al desbloquear el wallet. Verifica tu contraseña.')
+          setLoading(false)
+          return
+        }
+      }
+
+      const accountsToImport = backupAccounts.filter(acc => selectedAccounts.has(acc.address))
+      const imported: string[] = []
+      const errors: string[] = []
+
+      for (const accountData of accountsToImport) {
+        try {
+          // Cada cuenta en el backup desencriptado debería tener formato JSON de Polkadot.js
+          // Verificar que tenga address y encoded
+          if (!accountData.json || !accountData.json.address || !accountData.json.encoded) {
+            const accountName = accountData.meta?.name || accountData.address
+            errors.push(`${accountName}: Formato de cuenta inválido (falta address o encoded)`)
+            continue
+          }
+          
+          // Usar addFromJson para importar cada cuenta individual
+          // La contraseña del JSON es la misma para todas las cuentas del backup
+          const account = await addFromJson(
+            accountData.json,
+            jsonPassword,
+            password || undefined
+          )
+          
+          if (account) {
+            imported.push(account.address)
+            console.log(`[Import] ✅ Cuenta importada: ${account.address} (${accountData.meta?.name || 'Sin nombre'})`)
+          }
+        } catch (err) {
+          const accountName = accountData.meta?.name || accountData.address
+          const errorMsg = err instanceof Error ? err.message : 'Error desconocido'
+          errors.push(`${accountName}: ${errorMsg}`)
+          console.error(`[Import] ❌ Error al importar cuenta ${accountName}:`, err)
+        }
+      }
+
+      if (imported.length > 0) {
+        setSuccess(true)
+        setImportedAddress(imported[0])
+        setShowAccountSelection(false)
+        setBackupAccounts([])
+        setSelectedAccounts(new Set())
+        
+        if (errors.length > 0) {
+          setError(`Se importaron ${imported.length} cuenta(s), pero ${errors.length} fallaron: ${errors.join('; ')}`)
+        }
+        
+        // Limpiar formulario
+        setJsonData('')
+        setJsonFile(null)
+        setJsonPassword('')
+        setPassword('')
+        setConfirmPassword('')
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+
+        // Redirigir después de 2 segundos
+        setTimeout(() => {
+          navigate('/accounts')
+        }, 2000)
+      } else {
+        setError(`No se pudo importar ninguna cuenta. Errores: ${errors.join('; ')}`)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al importar las cuentas')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleToggleAccount = (address: string) => {
+    setSelectedAccounts(prev => {
+      const next = new Set(prev)
+      if (next.has(address)) {
+        next.delete(address)
+      } else {
+        next.add(address)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedAccounts.size === backupAccounts.length) {
+      setSelectedAccounts(new Set())
+    } else {
+      setSelectedAccounts(new Set(backupAccounts.map(acc => acc.address)))
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -250,14 +404,15 @@ export default function ImportAccount() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Método de Importación</CardTitle>
-          <CardDescription>
-            Elige cómo deseas importar tu cuenta
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      {!showAccountSelection && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Método de Importación</CardTitle>
+            <CardDescription>
+              Elige cómo deseas importar tu cuenta
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
           <Tabs value={method} onValueChange={(v) => setMethod(v as ImportMethod)} className="space-y-4">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="mnemonic">
@@ -408,9 +563,11 @@ export default function ImportAccount() {
           </Tabs>
         </CardContent>
       </Card>
+      )}
 
       {/* Configuración adicional */}
-      <Card>
+      {!showAccountSelection && (
+        <Card>
         <CardHeader>
           <CardTitle>Configuración de la Cuenta</CardTitle>
         </CardHeader>
@@ -467,6 +624,7 @@ export default function ImportAccount() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Errores y éxito */}
       {error && (
@@ -474,6 +632,99 @@ export default function ImportAccount() {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+      )}
+
+      {/* UI de selección de cuentas del backup completo de Polkadot.js */}
+      {showAccountSelection && backupAccounts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Seleccionar Cuentas para Importar
+            </CardTitle>
+            <CardDescription>
+              Se encontraron {backupAccounts.length} cuenta(s) en el backup. Selecciona cuáles deseas importar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSelectAll}
+              >
+                {selectedAccounts.size === backupAccounts.length ? 'Deseleccionar Todas' : 'Seleccionar Todas'}
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {selectedAccounts.size} de {backupAccounts.length} seleccionada(s)
+              </span>
+            </div>
+            
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {backupAccounts.map((accountData) => {
+                const isSelected = selectedAccounts.has(accountData.address)
+                return (
+                  <div
+                    key={accountData.address}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      isSelected ? 'bg-primary/10 border-primary' : 'bg-muted/50 hover:bg-muted'
+                    }`}
+                    onClick={() => handleToggleAccount(accountData.address)}
+                  >
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => handleToggleAccount(accountData.address)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate">
+                        {accountData.meta?.name || 'Sin nombre'}
+                      </div>
+                      <div className="text-sm text-muted-foreground font-mono truncate">
+                        {accountData.address}
+                      </div>
+                      {accountData.meta?.genesisHash && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Genesis: {accountData.meta.genesisHash.slice(0, 16)}...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAccountSelection(false)
+                  setBackupAccounts([])
+                  setSelectedAccounts(new Set())
+                }}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleImportSelectedAccounts}
+                disabled={loading || selectedAccounts.size === 0}
+                className="flex-1"
+              >
+                {loading ? (
+                  <>
+                    <Key className="mr-2 h-4 w-4 animate-spin" />
+                    Importando...
+                  </>
+                ) : (
+                  <>
+                    <Key className="mr-2 h-4 w-4" />
+                    Importar {selectedAccounts.size} Cuenta(s)
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {success && importedAddress && (
@@ -499,7 +750,8 @@ export default function ImportAccount() {
       )}
 
       {/* Botones de acción */}
-      <div className="flex gap-2">
+      {!showAccountSelection && (
+        <div className="flex gap-2">
         <Button
           variant="outline"
           onClick={() => navigate('/accounts')}
@@ -520,15 +772,18 @@ export default function ImportAccount() {
           {loading ? 'Importando...' : 'Importar Cuenta'}
         </Button>
       </div>
+      )}
 
       {/* Advertencia de seguridad */}
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Importante:</strong> Asegúrate de estar en un entorno seguro al ingresar tu
-          frase de recuperación. Nunca compartas tu frase de recuperación con nadie.
-        </AlertDescription>
-      </Alert>
+      {!showAccountSelection && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Importante:</strong> Asegúrate de estar en un entorno seguro al ingresar tu
+            frase de recuperación. Nunca compartas tu frase de recuperación con nadie.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   )
 }

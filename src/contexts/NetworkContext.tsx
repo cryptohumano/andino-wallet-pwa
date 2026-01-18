@@ -8,15 +8,17 @@ interface NetworkContextType {
   client: DedotClient | null
   isConnecting: boolean
   error: string | null
+  connectedEndpoint: string | null
 }
 
-const NetworkContext = createContext<NetworkContextType | undefined>(undefined)
+// Exportar el contexto para uso directo si es necesario
+export const NetworkContext = createContext<NetworkContextType | undefined>(undefined)
 
 export function NetworkProvider({ children }: { children: ReactNode }) {
   // Asset Hub (Paseo) como red por defecto
   const defaultChain = DEFAULT_CHAINS.find(c => c.endpoint === 'wss://sys.ibp.network/asset-hub-paseo') || DEFAULT_CHAINS[0]
   const [selectedChain, setSelectedChain] = useState<ChainInfo | null>(defaultChain)
-  const { client, isConnecting, error } = useDedotClient(selectedChain?.endpoint || null)
+  const { client, isConnecting, error, connectedEndpoint } = useDedotClient(selectedChain?.endpoint || null)
   
   // Asegurar que siempre haya una red seleccionada
   useEffect(() => {
@@ -33,6 +35,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
         client,
         isConnecting,
         error: error || null,
+        connectedEndpoint: connectedEndpoint || null,
       }}
     >
       {children}

@@ -397,7 +397,15 @@ export function readBackupFile(file: File): Promise<BackupData> {
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string
-        const backup = JSON.parse(text) as BackupData
+        const parsed = JSON.parse(text)
+        
+        // Verificar si es un backup de Polkadot.js (tiene 'encoded' y 'accounts' array)
+        // Si es así, no es un backup de Aura Wallet, rechazarlo con un mensaje apropiado
+        if (parsed.encoded && Array.isArray(parsed.accounts) && parsed.encoding) {
+          throw new Error('Este es un archivo de backup de Polkadot.js. Por favor, usa la opción "Importar Cuenta" > "Archivo JSON" para importarlo.')
+        }
+        
+        const backup = parsed as BackupData
         
         // Validar estructura básica
         if (!backup.version || !backup.createdAt) {

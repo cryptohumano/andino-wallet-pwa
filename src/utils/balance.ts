@@ -53,7 +53,12 @@ const CHAIN_SYMBOLS: Record<string, string> = {
 /**
  * Obtiene los decimales de una cadena basándose en su nombre o endpoint
  */
-export function getChainDecimals(chainNameOrEndpoint: string): number {
+export function getChainDecimals(chainNameOrEndpoint: string | null | undefined): number {
+  if (!chainNameOrEndpoint || typeof chainNameOrEndpoint !== 'string') {
+    // Por defecto, usar 10 (Polkadot estándar) si no se proporciona nombre
+    return 10
+  }
+  
   const chainKey = chainNameOrEndpoint.toLowerCase()
   
   // Buscar en el nombre de la cadena
@@ -70,7 +75,12 @@ export function getChainDecimals(chainNameOrEndpoint: string): number {
 /**
  * Obtiene el símbolo de una cadena basándose en su nombre o endpoint
  */
-export function getChainSymbol(chainNameOrEndpoint: string): string {
+export function getChainSymbol(chainNameOrEndpoint: string | null | undefined): string {
+  if (!chainNameOrEndpoint || typeof chainNameOrEndpoint !== 'string') {
+    // Por defecto, usar DOT si no se proporciona nombre
+    return 'DOT'
+  }
+  
   const chainKey = chainNameOrEndpoint.toLowerCase()
   
   // Buscar en el nombre de la cadena
@@ -92,7 +102,7 @@ export function getChainSymbol(chainNameOrEndpoint: string): string {
  */
 export function formatBalanceFromPlancks(
   value: bigint | string | number,
-  chainName: string,
+  chainName?: string | null,
   options: {
     withUnit?: boolean
     decimals?: number
@@ -152,7 +162,7 @@ export function parseBalanceToPlancks(
  */
 export function formatBalanceForDisplay(
   value: bigint | string | number,
-  chainName: string
+  chainName?: string | null
 ): string {
   return formatBalanceFromPlancks(value, chainName, {
     withUnit: true,
