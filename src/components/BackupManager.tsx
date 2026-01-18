@@ -33,11 +33,17 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [exportOptions, setExportOptions] = useState({
+    includeImages: false, // Por defecto no incluir imágenes (backup más pequeño)
+    includePDFs: false, // Por defecto no incluir PDFs (backup más pequeño)
+  })
   const [importOptions, setImportOptions] = useState({
     overwriteAccounts: false,
     overwriteContacts: false,
     overwriteApiConfigs: false,
     overwriteWebAuthn: false,
+    overwriteMountainLogs: false,
+    overwriteDocuments: false,
   })
   const [importPassword, setImportPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -48,6 +54,8 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
     apiConfigsImported: number
     webauthnImported: number
     transactionsImported: number
+    mountainLogsImported: number
+    documentsImported: number
     errors: string[]
   } | null>(null)
 
@@ -57,10 +65,13 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
     setSuccess(null)
 
     try {
-      console.log('[BackupManager] Iniciando descarga de backup...')
-      await downloadBackup()
+      console.log('[BackupManager] Iniciando descarga de backup...', exportOptions)
+      await downloadBackup(exportOptions)
       console.log('[BackupManager] ✅ Backup descargado exitosamente')
-      setSuccess('Backup exportado exitosamente. El archivo debería descargarse automáticamente.')
+      const sizeInfo = exportOptions.includeImages || exportOptions.includePDFs
+        ? ' (incluye imágenes/PDFs - archivo más grande)'
+        : ' (solo metadata - archivo más pequeño)'
+      setSuccess(`Backup exportado exitosamente${sizeInfo}. El archivo debería descargarse automáticamente.`)
       
       // Mostrar información adicional en consola para debugging
       console.log('[BackupManager] Si no se descargó el archivo, verifica:')
@@ -186,13 +197,20 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
             result.transactionsImported
 
           if (totalImported > 0) {
-            setSuccess(
-              `Importación completada: ${result.accountsImported} cuenta(s), ` +
-              `${result.contactsImported} contacto(s), ` +
-              `${result.apiConfigsImported} configuración(es) de API, ` +
-              `${result.webauthnImported} credencial(es) WebAuthn, ` +
-              `${result.transactionsImported} transacción(es)`
-            )
+            const parts = [
+              `${result.accountsImported} cuenta(s)`,
+              `${result.contactsImported} contacto(s)`,
+              `${result.apiConfigsImported} configuración(es) de API`,
+              `${result.webauthnImported} credencial(es) WebAuthn`,
+              `${result.transactionsImported} transacción(es)`,
+            ]
+            if (result.mountainLogsImported > 0) {
+              parts.push(`${result.mountainLogsImported} bitácora(s)`)
+            }
+            if (result.documentsImported > 0) {
+              parts.push(`${result.documentsImported} documento(s)`)
+            }
+            setSuccess(`Importación completada: ${parts.join(', ')}`)
       } else {
         setSuccess('No se importaron nuevos datos (puede que ya existan)')
       }
@@ -235,6 +253,10 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
   const contactsCount = backup?.contacts?.length || 0
   const apiConfigsCount = backup?.apiConfigs?.length || 0
   const webauthnCount = backup?.webauthnCredentials?.length || 0
+  const mountainLogsCount = backup?.mountainLogs?.length || 0
+  const documentsCount = backup?.documents?.length || 0
+  const includesImages = backup?.metadata?.includesImages || false
+  const includesPDFs = backup?.metadata?.includesPDFs || false
 
   return (
     <div className="space-y-4">
@@ -285,7 +307,40 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
               Descarga un archivo JSON con todos tus datos
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Opciones de exportación</Label>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="includeImages"
+                    checked={exportOptions.includeImages}
+                    onCheckedChange={(checked) =>
+                      setExportOptions({ ...exportOptions, includeImages: checked === true })
+                    }
+                  />
+                  <Label htmlFor="includeImages" className="text-sm font-normal cursor-pointer">
+                    Incluir imágenes completas (base64)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="includePDFs"
+                    checked={exportOptions.includePDFs}
+                    onCheckedChange={(checked) =>
+                      setExportOptions({ ...exportOptions, includePDFs: checked === true })
+                    }
+                  />
+                  <Label htmlFor="includePDFs" className="text-sm font-normal cursor-pointer">
+                    Incluir PDFs completos (base64)
+                  </Label>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Por defecto solo se incluye metadata (archivo más pequeño). 
+                Marca estas opciones para incluir imágenes y PDFs completos (archivo más grande).
+              </p>
+            </div>
             <Button
               onClick={handleExport}
               disabled={isExporting}
@@ -303,8 +358,9 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
                 </>
               )}
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">
-              El archivo incluirá: cuentas, credenciales WebAuthn, contactos y configuraciones de API
+            <p className="text-xs text-muted-foreground">
+              El archivo incluirá: cuentas, credenciales WebAuthn, contactos, configuraciones de API, 
+              bitácoras y documentos {exportOptions.includeImages || exportOptions.includePDFs ? '(con imágenes/PDFs)' : '(solo metadata)'}
             </p>
           </CardContent>
         </Card>
@@ -376,6 +432,12 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
                     <li>Contactos: {contactsCount}</li>
                     <li>Configuraciones de API: {apiConfigsCount}</li>
                     <li>Credenciales WebAuthn: {webauthnCount}</li>
+                    {mountainLogsCount > 0 && (
+                      <li>Bitácoras: {mountainLogsCount} {includesImages ? '(con imágenes)' : '(solo metadata)'}</li>
+                    )}
+                    {documentsCount > 0 && (
+                      <li>Documentos: {documentsCount} {includesPDFs ? '(con PDFs)' : '(solo metadata)'}</li>
+                    )}
                   </ul>
                 </AlertDescription>
               </Alert>
@@ -440,6 +502,36 @@ export function BackupManager({ onImportComplete }: BackupManagerProps = {}) {
                       Sobrescribir credenciales WebAuthn ({webauthnCount} credencial(es))
                     </Label>
                   </div>
+
+                  {mountainLogsCount > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="overwriteMountainLogs"
+                        checked={importOptions.overwriteMountainLogs}
+                        onCheckedChange={(checked) =>
+                          setImportOptions({ ...importOptions, overwriteMountainLogs: checked === true })
+                        }
+                      />
+                      <Label htmlFor="overwriteMountainLogs" className="cursor-pointer">
+                        Sobrescribir bitácoras existentes ({mountainLogsCount} bitácora(s))
+                      </Label>
+                    </div>
+                  )}
+
+                  {documentsCount > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="overwriteDocuments"
+                        checked={importOptions.overwriteDocuments}
+                        onCheckedChange={(checked) =>
+                          setImportOptions({ ...importOptions, overwriteDocuments: checked === true })
+                        }
+                      />
+                      <Label htmlFor="overwriteDocuments" className="cursor-pointer">
+                        Sobrescribir documentos existentes ({documentsCount} documento(s))
+                      </Label>
+                    </div>
+                  )}
                 </div>
 
                 {/* Campo de contraseña si hay cuentas en el backup */}

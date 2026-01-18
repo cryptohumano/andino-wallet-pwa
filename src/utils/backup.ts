@@ -6,6 +6,8 @@ import { openSharedDB } from './indexedDB'
 import type { EncryptedAccount } from './secureStorage'
 import type { WebAuthnCredential } from './webauthn'
 import type { StoredTransaction } from './transactionStorage'
+import type { MountainLog, MountainLogImage } from '@/types/mountainLogs'
+import type { Document } from '@/types/documents'
 
 export interface BackupData {
   version: string
@@ -15,21 +17,85 @@ export interface BackupData {
   transactions: StoredTransaction[]
   contacts: any[]
   apiConfigs: any[]
+  mountainLogs?: MountainLog[] // Bitácoras de montañismo
+  documents?: Document[] // Documentos firmados
   metadata?: {
     appName: string
     appVersion?: string
     description?: string
+    includesImages?: boolean // Si incluye imágenes completas (base64)
+    includesPDFs?: boolean // Si incluye PDFs completos (base64)
   }
 }
 
-const BACKUP_VERSION = '1.0.0'
+const BACKUP_VERSION = '1.1.0' // Incrementado para incluir bitácoras y documentos
 const CONTACTS_STORAGE_KEY = 'aura-wallet-contacts'
 const API_CONFIGS_STORAGE_KEY = 'aura-wallet-api-configs'
 
 /**
- * Exporta todos los datos de la aplicación a un objeto JSON
+ * Sanitiza una bitácora removiendo base64 de imágenes si no se incluyen
  */
-export async function exportBackup(): Promise<BackupData> {
+function sanitizeMountainLog(log: MountainLog, includeImages: boolean): MountainLog {
+  if (includeImages) {
+    return log // Incluir todo
+  }
+
+  // Remover base64 de imágenes, mantener solo metadata
+  const sanitizedLog: MountainLog = {
+    ...log,
+    milestones: log.milestones.map(milestone => ({
+      ...milestone,
+      images: milestone.images.map((img: MountainLogImage) => ({
+        id: img.id,
+        // data y thumbnail se remueven (solo metadata)
+        metadata: img.metadata,
+        description: img.description,
+        tags: img.tags,
+      })) as MountainLogImage[],
+    })),
+    // También sanitizar imágenes legacy si existen
+    images: log.images?.map((img: MountainLogImage) => ({
+      id: img.id,
+      metadata: img.metadata,
+      description: img.description,
+      tags: img.tags,
+    })) as MountainLogImage[] || [],
+  }
+
+  return sanitizedLog
+}
+
+/**
+ * Sanitiza un documento removiendo base64 del PDF si no se incluye
+ */
+function sanitizeDocument(doc: Document, includePDFs: boolean): Document {
+  if (includePDFs) {
+    return doc // Incluir todo
+  }
+
+  // Remover base64 del PDF, mantener solo metadata y hash
+  const sanitizedDoc: Document = {
+    ...doc,
+    pdf: undefined, // Remover base64 del PDF
+    // Mantener pdfHash y pdfSize para referencia
+    versions: doc.versions?.map(version => ({
+      ...version,
+      pdf: undefined, // Remover base64 de versiones también
+    })),
+  }
+
+  return sanitizedDoc
+}
+
+/**
+ * Exporta todos los datos de la aplicación a un objeto JSON
+ * @param options Opciones de exportación
+ */
+export async function exportBackup(options: {
+  includeImages?: boolean // Si incluir imágenes completas (base64) en bitácoras
+  includePDFs?: boolean // Si incluir PDFs completos (base64) en documentos
+} = {}): Promise<BackupData> {
+  const { includeImages = false, includePDFs = false } = options
   console.log('[Backup] Iniciando exportación de datos...')
 
   // 1. Obtener cuentas encriptadas de IndexedDB
@@ -96,7 +162,33 @@ export async function exportBackup(): Promise<BackupData> {
     // No fallar si no hay credenciales WebAuthn
   }
 
-  // 3. Obtener contactos de localStorage
+  // 3. Obtener transacciones de IndexedDB
+  const transactions: StoredTransaction[] = []
+  try {
+    const db = await openSharedDB()
+    const transaction = db.transaction(['transactions'], 'readonly')
+    const store = transaction.objectStore('transactions')
+    const request = store.getAll()
+
+    await new Promise<void>((resolve, reject) => {
+      request.onsuccess = () => {
+        const results = request.result as StoredTransaction[]
+        transactions.push(...results)
+        console.log(`[Backup] ✅ ${results.length} transacción(es) exportada(s)`)
+        resolve()
+      }
+      request.onerror = () => {
+        const error = request.error || new Error('Error al leer transacciones')
+        console.error('[Backup] ❌ Error al leer transacciones:', error)
+        reject(error)
+      }
+    })
+  } catch (error) {
+    console.error('[Backup] ❌ Error al acceder a transacciones:', error)
+    // No fallar si no hay transacciones
+  }
+
+  // 4. Obtener contactos de localStorage
   const contacts: any[] = []
   try {
     const stored = localStorage.getItem(CONTACTS_STORAGE_KEY)
@@ -124,6 +216,62 @@ export async function exportBackup(): Promise<BackupData> {
     // No fallar si no hay configuraciones
   }
 
+  // 6. Obtener bitácoras de montañismo de IndexedDB
+  const mountainLogs: MountainLog[] = []
+  try {
+    const db = await openSharedDB()
+    const transaction = db.transaction(['mountain-logs'], 'readonly')
+    const store = transaction.objectStore('mountain-logs')
+    const request = store.getAll()
+
+    await new Promise<void>((resolve, reject) => {
+      request.onsuccess = () => {
+        const results = request.result as MountainLog[]
+        // Sanitizar bitácoras: remover base64 de imágenes si no se incluyen
+        const sanitizedLogs = results.map(log => sanitizeMountainLog(log, includeImages))
+        mountainLogs.push(...sanitizedLogs)
+        console.log(`[Backup] ✅ ${results.length} bitácora(s) exportada(s)`)
+        resolve()
+      }
+      request.onerror = () => {
+        const error = request.error || new Error('Error al leer bitácoras')
+        console.error('[Backup] ❌ Error al leer bitácoras:', error)
+        reject(error)
+      }
+    })
+  } catch (error) {
+    console.error('[Backup] ❌ Error al acceder a bitácoras:', error)
+    // No fallar si no hay bitácoras
+  }
+
+  // 7. Obtener documentos de IndexedDB
+  const documents: Document[] = []
+  try {
+    const db = await openSharedDB()
+    const transaction = db.transaction(['documents'], 'readonly')
+    const store = transaction.objectStore('documents')
+    const request = store.getAll()
+
+    await new Promise<void>((resolve, reject) => {
+      request.onsuccess = () => {
+        const results = request.result as Document[]
+        // Sanitizar documentos: remover base64 de PDFs si no se incluyen
+        const sanitizedDocs = results.map(doc => sanitizeDocument(doc, includePDFs))
+        documents.push(...sanitizedDocs)
+        console.log(`[Backup] ✅ ${results.length} documento(s) exportado(s)`)
+        resolve()
+      }
+      request.onerror = () => {
+        const error = request.error || new Error('Error al leer documentos')
+        console.error('[Backup] ❌ Error al leer documentos:', error)
+        reject(error)
+      }
+    })
+  } catch (error) {
+    console.error('[Backup] ❌ Error al acceder a documentos:', error)
+    // No fallar si no hay documentos
+  }
+
   const backup: BackupData = {
     version: BACKUP_VERSION,
     createdAt: Date.now(),
@@ -132,9 +280,13 @@ export async function exportBackup(): Promise<BackupData> {
     transactions,
     contacts,
     apiConfigs,
+    mountainLogs: mountainLogs.length > 0 ? mountainLogs : undefined,
+    documents: documents.length > 0 ? documents : undefined,
     metadata: {
-      appName: 'Aura Wallet',
-      description: 'Backup de datos de Aura Wallet',
+      appName: 'Andino Wallet',
+      description: 'Backup de datos de Andino Wallet',
+      includesImages: includeImages,
+      includesPDFs: includePDFs,
     },
   }
 
@@ -145,11 +297,15 @@ export async function exportBackup(): Promise<BackupData> {
 /**
  * Descarga el backup como archivo JSON
  * En dispositivos móviles, intenta usar la Share API primero
+ * @param options Opciones de exportación
  */
-export async function downloadBackup(): Promise<void> {
+export async function downloadBackup(options: {
+  includeImages?: boolean
+  includePDFs?: boolean
+} = {}): Promise<void> {
   try {
     console.log('[Backup] Iniciando exportación...')
-    const backup = await exportBackup()
+    const backup = await exportBackup(options)
     console.log('[Backup] Exportación completada, creando archivo...')
     
     const json = JSON.stringify(backup, null, 2)
@@ -264,6 +420,13 @@ export function readBackupFile(file: File): Promise<BackupData> {
         if (!Array.isArray(backup.apiConfigs)) {
           backup.apiConfigs = []
         }
+        // Bitácoras y documentos son opcionales (nuevos en v1.1.0)
+        if (backup.mountainLogs && !Array.isArray(backup.mountainLogs)) {
+          backup.mountainLogs = []
+        }
+        if (backup.documents && !Array.isArray(backup.documents)) {
+          backup.documents = []
+        }
         
         console.log('[Backup] ✅ Archivo de backup leído y validado')
         resolve(backup)
@@ -293,12 +456,16 @@ export async function importBackup(
     overwriteContacts?: boolean
     overwriteApiConfigs?: boolean
     overwriteWebAuthn?: boolean
+    overwriteMountainLogs?: boolean
+    overwriteDocuments?: boolean
   } = {}
 ): Promise<{
   accountsImported: number
   contactsImported: number
   apiConfigsImported: number
   webauthnImported: number
+  mountainLogsImported: number
+  documentsImported: number
   errors: string[]
 }> {
   console.log('[Backup] Iniciando importación de datos...')
@@ -308,6 +475,8 @@ export async function importBackup(
   let apiConfigsImported = 0
   let webauthnImported = 0
   let transactionsImported = 0
+  let mountainLogsImported = 0
+  let documentsImported = 0
 
   // 1. Importar cuentas
   if (backup.accounts && backup.accounts.length > 0) {
@@ -639,6 +808,170 @@ export async function importBackup(
     }
   }
 
+  // 6. Importar bitácoras de montañismo
+  if (backup.mountainLogs && backup.mountainLogs.length > 0) {
+    try {
+      console.log(`[Backup] Importando ${backup.mountainLogs.length} bitácora(s)...`)
+      const db = await openSharedDB()
+      const transaction = db.transaction(['mountain-logs'], 'readwrite')
+      const store = transaction.objectStore('mountain-logs')
+
+      for (const log of backup.mountainLogs) {
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            console.warn(`[Backup] ⚠️ Timeout verificando bitácora ${log.logId}`)
+            resolve()
+          }, 5000)
+
+          try {
+            const existingRequest = store.get(log.logId)
+            existingRequest.onsuccess = () => {
+              clearTimeout(timeout)
+              const exists = existingRequest.result !== undefined
+              if (exists && !options.overwriteMountainLogs) {
+                console.log(`[Backup] ⚠️ Bitácora ${log.logId} ya existe, omitiendo`)
+                resolve()
+                return
+              }
+
+              // Asegurar que updatedAt esté actualizado
+              const logToSave = {
+                ...log,
+                updatedAt: Date.now(),
+              }
+
+              const putRequest = store.put(logToSave)
+              putRequest.onsuccess = () => {
+                mountainLogsImported++
+                console.log(`[Backup] ✅ Bitácora importada: ${log.logId}`)
+                resolve()
+              }
+              putRequest.onerror = () => {
+                const error = putRequest.error || new Error('Error al importar bitácora')
+                errors.push(`Error al importar bitácora ${log.logId}: ${error.message}`)
+                console.error('[Backup] ❌', error)
+                resolve()
+              }
+            }
+            existingRequest.onerror = () => {
+              clearTimeout(timeout)
+              errors.push(`Error al verificar bitácora ${log.logId}`)
+              resolve()
+            }
+          } catch (error) {
+            errors.push(`Error al procesar bitácora ${log.logId}`)
+            clearTimeout(timeout)
+            resolve()
+          }
+        })
+      }
+
+      console.log(`[Backup] ✅ ${mountainLogsImported} bitácora(s) procesada(s) de ${backup.mountainLogs.length}`)
+
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          console.warn('[Backup] ⚠️ Timeout esperando transacción de bitácoras')
+          resolve()
+        }, 10000)
+
+        transaction.oncomplete = () => {
+          clearTimeout(timeout)
+          console.log('[Backup] ✅ Transacción de bitácoras completada')
+          resolve()
+        }
+        transaction.onerror = () => {
+          clearTimeout(timeout)
+          const error = transaction.error || new Error('Error en la transacción de bitácoras')
+          errors.push(`Error en la transacción de bitácoras: ${error.message}`)
+          console.error('[Backup] ❌ Error en transacción de bitácoras:', error)
+          resolve()
+        }
+      })
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (error) {
+      errors.push(`Error al importar bitácoras: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  // 7. Importar documentos
+  if (backup.documents && backup.documents.length > 0) {
+    try {
+      console.log(`[Backup] Importando ${backup.documents.length} documento(s)...`)
+      const db = await openSharedDB()
+      const transaction = db.transaction(['documents'], 'readwrite')
+      const store = transaction.objectStore('documents')
+
+      for (const doc of backup.documents) {
+        await new Promise<void>((resolve) => {
+          const timeout = setTimeout(() => {
+            console.warn(`[Backup] ⚠️ Timeout verificando documento ${doc.documentId}`)
+            resolve()
+          }, 5000)
+
+          try {
+            const existingRequest = store.get(doc.documentId)
+            existingRequest.onsuccess = () => {
+              clearTimeout(timeout)
+              const exists = existingRequest.result !== undefined
+              if (exists && !options.overwriteDocuments) {
+                console.log(`[Backup] ⚠️ Documento ${doc.documentId} ya existe, omitiendo`)
+                resolve()
+                return
+              }
+
+              const putRequest = store.put(doc)
+              putRequest.onsuccess = () => {
+                documentsImported++
+                console.log(`[Backup] ✅ Documento importado: ${doc.documentId}`)
+                resolve()
+              }
+              putRequest.onerror = () => {
+                const error = putRequest.error || new Error('Error al importar documento')
+                errors.push(`Error al importar documento ${doc.documentId}: ${error.message}`)
+                console.error('[Backup] ❌', error)
+                resolve()
+              }
+            }
+            existingRequest.onerror = () => {
+              clearTimeout(timeout)
+              errors.push(`Error al verificar documento ${doc.documentId}`)
+              resolve()
+            }
+          } catch (error) {
+            errors.push(`Error al procesar documento ${doc.documentId}`)
+            clearTimeout(timeout)
+            resolve()
+          }
+        })
+      }
+
+      console.log(`[Backup] ✅ ${documentsImported} documento(s) procesado(s) de ${backup.documents.length}`)
+
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+          console.warn('[Backup] ⚠️ Timeout esperando transacción de documentos')
+          resolve()
+        }, 10000)
+
+        transaction.oncomplete = () => {
+          clearTimeout(timeout)
+          console.log('[Backup] ✅ Transacción de documentos completada')
+          resolve()
+        }
+        transaction.onerror = () => {
+          clearTimeout(timeout)
+          const error = transaction.error || new Error('Error en la transacción de documentos')
+          errors.push(`Error en la transacción de documentos: ${error.message}`)
+          console.error('[Backup] ❌ Error en transacción de documentos:', error)
+          resolve()
+        }
+      })
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (error) {
+      errors.push(`Error al importar documentos: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
   console.log('[Backup] ✅ Importación completada')
   return {
     accountsImported,
@@ -646,6 +979,8 @@ export async function importBackup(
     apiConfigsImported,
     webauthnImported,
     transactionsImported,
+    mountainLogsImported,
+    documentsImported,
     errors,
   }
 }

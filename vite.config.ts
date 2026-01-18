@@ -107,10 +107,17 @@ export default defineConfig({
         runtimeCaching: [
           {
             // Excluir servicios de mapas del cache (pueden fallar y causar problemas)
+            // Esta regla debe ir ANTES de la regla general para tener prioridad
+            // Usamos NetworkFirst con timeout corto para evitar errores persistentes
             urlPattern: /^https:\/\/.*staticmap\.openstreetmap\.(de|org|fr)\/.*/,
-            handler: 'NetworkOnly',
+            handler: 'NetworkFirst',
             options: {
               cacheName: 'map-cache',
+              networkTimeoutSeconds: 10, // Timeout de 10 segundos
+              // No cachear respuestas fallidas
+              cacheableResponse: {
+                statuses: [200], // Solo cachear respuestas exitosas
+              },
             }
           },
           {
@@ -121,6 +128,10 @@ export default defineConfig({
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 // 24 horas
+              },
+              // Excluir staticmap de la regla general
+              matchOptions: {
+                ignoreSearch: false,
               }
             }
           }
