@@ -187,7 +187,7 @@ export function ImageGallery({ images, onDelete, canDelete = true }: ImageGaller
 
               {/* Panel de metadata */}
               {showMetadata && (
-                <Card className="absolute bottom-0 left-0 right-0 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-md bg-background/98 backdrop-blur-sm z-20 max-h-[75vh] sm:max-h-[60vh] overflow-hidden flex flex-col rounded-t-xl sm:rounded-lg shadow-2xl border-t-2 sm:border-t border-primary/20">
+                <Card className="absolute bottom-0 left-0 right-0 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-md bg-background/98 backdrop-blur-sm z-30 max-h-[80vh] sm:max-h-[60vh] overflow-hidden flex flex-col rounded-t-xl sm:rounded-lg shadow-2xl border-t-2 sm:border-t border-primary/20">
                   {/* Header sticky siempre visible */}
                   <div className="flex items-center justify-between p-4 pb-3 border-b bg-background/98 backdrop-blur-sm sticky top-0 z-10 flex-shrink-0">
                     <h3 className="font-semibold flex items-center gap-2 text-base">
@@ -212,12 +212,19 @@ export function ImageGallery({ images, onDelete, canDelete = true }: ImageGaller
                     <div className="space-y-2 text-sm">
                       <div>
                         <p className="text-muted-foreground text-xs">Nombre</p>
-                        <p className="font-medium">{selectedImage.metadata.filename}</p>
+                        <p className="font-medium break-words">{selectedImage.metadata.filename}</p>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                      {selectedImage.metadata.mimeType && (
                         <div>
+                          <p className="text-muted-foreground text-xs">Tipo de Archivo</p>
+                          <p className="font-medium">{selectedImage.metadata.mimeType}</p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
                           <p className="text-muted-foreground text-xs">Fecha de Captura</p>
                           <p className="font-medium">{formatDate(selectedImage.metadata.capturedAt)}</p>
                         </div>
@@ -303,6 +310,33 @@ export function ImageGallery({ images, onDelete, canDelete = true }: ImageGaller
                                 <span>{selectedImage.metadata.cameraSettings.focalLength}</span>
                               </div>
                             )}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedImage.tags && selectedImage.tags.length > 0 && (
+                        <div className="pt-2 border-t">
+                          <p className="text-muted-foreground text-xs mb-2">Etiquetas</p>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedImage.tags.map((tag, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedImage.metadata.exifData && Object.keys(selectedImage.metadata.exifData).length > 0 && (
+                        <div className="pt-2 border-t">
+                          <p className="text-muted-foreground text-xs mb-1">Datos EXIF Adicionales</p>
+                          <div className="space-y-1 text-xs max-h-32 overflow-y-auto">
+                            {Object.entries(selectedImage.metadata.exifData).map(([key, value]) => (
+                              <div key={key} className="flex justify-between gap-2">
+                                <span className="text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                <span className="font-mono text-right break-words">{String(value)}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       )}
