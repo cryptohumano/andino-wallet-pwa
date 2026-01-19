@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -68,7 +68,7 @@ export default function Transactions() {
     }
   }, [accountFromUrl, chainFromUrl])
 
-  const loadTransactions = async () => {
+  const loadTransactions = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
@@ -105,11 +105,29 @@ export default function Transactions() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [filterType, selectedAccount, selectedChain, statusFilter])
 
   useEffect(() => {
     loadTransactions()
   }, [filterType, selectedAccount, selectedChain, statusFilter])
+
+  // Escuchar eventos de nuevas transacciones guardadas
+  useEffect(() => {
+    const handleTransactionSaved = (event: Event) => {
+      const customEvent = event as CustomEvent
+      console.log('[Transactions] Nueva transacción guardada, recargando lista...', {
+        transaction: customEvent.detail?.transaction
+      })
+      // Recargar transacciones cuando se guarda una nueva
+      loadTransactions()
+    }
+
+    window.addEventListener('transaction-saved', handleTransactionSaved)
+    
+    return () => {
+      window.removeEventListener('transaction-saved', handleTransactionSaved)
+    }
+  }, [loadTransactions]) // Incluir loadTransactions como dependencia
 
   const handleCopyHash = async (hash: string) => {
     await navigator.clipboard.writeText(hash)

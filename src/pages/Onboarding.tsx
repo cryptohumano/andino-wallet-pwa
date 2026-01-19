@@ -99,36 +99,66 @@ export default function Onboarding() {
 
   if (step === 'welcome') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
-        <Card className="w-full max-w-2xl">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#05C7F2]/10 via-white to-[#F21667]/10 dark:from-[#0477BF]/20 dark:via-slate-900 dark:to-[#F21667]/20">
+        <Card className="w-full max-w-2xl shadow-xl border-2 border-[#0477BF]/20">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles className="h-8 w-8 text-primary" />
+            {/* Logo de Andino Wallet */}
+            <div className="mx-auto mb-6 flex flex-col items-center">
+              <div className="w-32 h-32 rounded-3xl bg-gradient-to-br from-[#0477BF] via-[#05C7F2] to-[#F21667] flex items-center justify-center shadow-2xl mb-4 ring-4 ring-[#F2E205]/40 dark:ring-[#F2E205]/20">
+                <img 
+                  src="/web-app-manifest-192x192.png" 
+                  alt="Andino Wallet" 
+                  className="w-28 h-28 rounded-2xl"
+                  onError={(e) => {
+                    // Fallback si no hay logo
+                    const target = e.target as HTMLImageElement
+                    target.style.display = 'none'
+                    const parent = target.parentElement
+                    if (parent) {
+                      parent.innerHTML = '<div class="text-white text-4xl font-bold">AW</div>'
+                    }
+                  }}
+                />
+              </div>
+              <div className="text-center">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-[#0477BF] via-[#05C7F2] to-[#F21667] bg-clip-text text-transparent mb-2">
+                  Andino Wallet
+                </h1>
+                <p className="text-lg font-semibold text-[#0477BF] dark:text-[#05C7F2] mb-1">
+                  Federación de Andinismo de Chile
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Tu wallet especializada para montañistas
+                </p>
+              </div>
             </div>
-            <CardTitle className="text-3xl">Bienvenido a Andino Wallet</CardTitle>
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-[#05C7F2]/20 dark:bg-[#0477BF]/30 flex items-center justify-center">
+              <Sparkles className="h-8 w-8 text-[#0477BF] dark:text-[#05C7F2]" />
+            </div>
+            <CardTitle className="text-3xl">Bienvenido</CardTitle>
             <CardDescription className="text-lg mt-2">
-              Tu wallet criptográfica segura y privada
+              Tu wallet criptográfica segura y privada para montañistas
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid md:grid-cols-3 gap-4">
-              <div className="text-center p-4 rounded-lg border">
-                <Wallet className="h-8 w-8 mx-auto mb-2 text-primary" />
-                <h3 className="font-semibold mb-1">Segura</h3>
+              <div className="text-center p-4 rounded-lg border-2 border-[#0477BF]/30 dark:border-[#0477BF]/50 bg-[#05C7F2]/10 dark:bg-[#0477BF]/10">
+                <Wallet className="h-8 w-8 mx-auto mb-2 text-[#0477BF] dark:text-[#05C7F2]" />
+                <h3 className="font-semibold mb-1 text-[#0477BF] dark:text-[#05C7F2]">Segura</h3>
                 <p className="text-sm text-muted-foreground">
                   Tus claves privadas nunca salen de tu dispositivo
                 </p>
               </div>
-              <div className="text-center p-4 rounded-lg border">
-                <Shield className="h-8 w-8 mx-auto mb-2 text-primary" />
-                <h3 className="font-semibold mb-1">Encriptada</h3>
+              <div className="text-center p-4 rounded-lg border-2 border-[#05C7F2]/30 dark:border-[#05C7F2]/50 bg-[#05C7F2]/10 dark:bg-[#05C7F2]/10">
+                <Shield className="h-8 w-8 mx-auto mb-2 text-[#05C7F2] dark:text-[#05C7F2]" />
+                <h3 className="font-semibold mb-1 text-[#0477BF] dark:text-[#05C7F2]">Encriptada</h3>
                 <p className="text-sm text-muted-foreground">
                   Protección con contraseña y WebAuthn
                 </p>
               </div>
-              <div className="text-center p-4 rounded-lg border">
-                <Lock className="h-8 w-8 mx-auto mb-2 text-primary" />
-                <h3 className="font-semibold mb-1">Offline</h3>
+              <div className="text-center p-4 rounded-lg border-2 border-[#F21667]/30 dark:border-[#F21667]/50 bg-[#F21667]/10 dark:bg-[#F21667]/10">
+                <Lock className="h-8 w-8 mx-auto mb-2 text-[#F21667] dark:text-[#F21667]" />
+                <h3 className="font-semibold mb-1 text-[#F21667] dark:text-[#F21667]">Offline</h3>
                 <p className="text-sm text-muted-foreground">
                   Funciona completamente sin conexión
                 </p>

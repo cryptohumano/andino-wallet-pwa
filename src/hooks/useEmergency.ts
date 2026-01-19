@@ -118,6 +118,29 @@ export function useEmergency() {
 
     try {
       setSubmitting(true)
+      
+      // PROTECCIÓN: Verificar si ya existe una emergencia activa para esta bitácora
+      if (data.relatedLogId) {
+        const existingEmergencies = await getEmergenciesByLogIdStorage(data.relatedLogId)
+        const activeEmergency = existingEmergencies.find(e => 
+          (e.status === 'pending' || e.status === 'submitted' || e.status === 'acknowledged' || e.status === 'in_progress') &&
+          e.blockchainTxHash // Solo considerar si ya fue enviada
+        )
+        
+        if (activeEmergency && activeEmergency.blockchainTxHash) {
+          console.warn('[useEmergency] ⚠️ Ya existe una emergencia activa enviada para esta bitácora:', {
+            existingEmergencyId: activeEmergency.emergencyId,
+            txHash: activeEmergency.blockchainTxHash,
+            status: activeEmergency.status,
+          })
+          toast.warning('Ya existe una emergencia activa para esta bitácora', {
+            description: `Emergencia: ${activeEmergency.emergencyId.substring(0, 8)}...`
+          })
+          setSubmitting(false)
+          return activeEmergency
+        }
+      }
+      
       toast.info('Creando emergencia...')
 
       // 1. Crear emergencia localmente

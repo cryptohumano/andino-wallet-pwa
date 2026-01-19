@@ -19,6 +19,7 @@ import { fillDummyData } from '@/data/dummyAvisoSalida'
 import { toast } from 'sonner'
 import { DummyDataSummary } from './DummyDataSummary'
 import { useKeyringContext } from '@/contexts/KeyringContext'
+import { useActiveAccount } from '@/contexts/ActiveAccountContext'
 import Identicon from '@polkadot/react-identicon'
 
 interface AvisoSalidaFormProps {
@@ -254,7 +255,7 @@ export function AvisoSalidaForm({ log, onUpdate, onComplete }: AvisoSalidaFormPr
             <div className="space-y-2">
               <Label htmlFor="account-selector-aviso">Cuenta</Label>
               <Select
-                value={log.relatedAccount || accounts[0]?.address || ''}
+                value={log.relatedAccount || activeAccount || accounts[0]?.address || ''}
                 onValueChange={(newAccountAddress) => {
                   onUpdate({
                     ...log,

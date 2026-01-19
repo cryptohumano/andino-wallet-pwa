@@ -59,11 +59,36 @@ export function Unlock() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background to-muted">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-[#05C7F2]/10 via-white to-[#F21667]/10 dark:from-[#0477BF]/20 dark:via-slate-900 dark:to-[#F21667]/20">
+      <Card className="w-full max-w-md shadow-xl border-2 border-[#0477BF]/20">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-            <Lock className="h-8 w-8 text-primary" />
+          {/* Logo de Andino Wallet */}
+          <div className="mx-auto mb-6 flex flex-col items-center">
+            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#0477BF] via-[#05C7F2] to-[#F21667] flex items-center justify-center shadow-lg mb-3 ring-2 ring-[#F2E205]/30">
+              <img 
+                src="/web-app-manifest-192x192.png" 
+                alt="Andino Wallet" 
+                className="w-20 h-20 rounded-xl"
+                onError={(e) => {
+                  // Fallback si no hay logo
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                  const parent = target.parentElement
+                  if (parent) {
+                    parent.innerHTML = '<div class="text-white text-2xl font-bold">AW</div>'
+                  }
+                }}
+              />
+            </div>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-[#0477BF] via-[#05C7F2] to-[#F21667] bg-clip-text text-transparent">
+                Andino Wallet
+              </h1>
+              <p className="text-sm text-[#0477BF] dark:text-[#05C7F2] mt-1 font-medium">Federación de Andinismo de Chile</p>
+            </div>
+          </div>
+          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-[#05C7F2]/20 dark:bg-[#0477BF]/30 flex items-center justify-center">
+            <Lock className="h-8 w-8 text-[#0477BF] dark:text-[#05C7F2]" />
           </div>
           <CardTitle className="text-2xl">Desbloquear Wallet</CardTitle>
           <CardDescription>

@@ -110,6 +110,15 @@ export async function saveTransaction(txData: StoredTransaction): Promise<void> 
         hasMetadata: !!cleanTxData.metadata,
         metadata: cleanTxData.metadata,
       })
+      
+      // Disparar evento personalizado para notificar que se guardó una nueva transacción
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('transaction-saved', {
+          detail: { transaction: cleanTxData }
+        }))
+        console.log('[Transaction Storage] 📢 Evento transaction-saved disparado')
+      }
+      
       resolve()
     }
     

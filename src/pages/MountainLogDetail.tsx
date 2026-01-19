@@ -61,6 +61,7 @@ import type { Document } from '@/types/documents'
 import { createDocumentFromPDF } from '@/services/documents/DocumentService'
 import { signDocumentWithSubstrate } from '@/services/signatures/SubstrateSigner'
 import { useKeyringContext } from '@/contexts/KeyringContext'
+import { useActiveAccount } from '@/contexts/ActiveAccountContext'
 import {
   Select,
   SelectContent,
@@ -1223,14 +1224,14 @@ export default function MountainLogDetail() {
             
             setShowAvisoSalida(false)
             // Actualizar título con lugar de destino si existe
-            // REGLA: Asignar cuenta automáticamente si no está asignada (solo al crear)
-            const currentAccount = accounts.length > 0 ? accounts[0].address : undefined
+            // REGLA: Asignar cuenta activa automáticamente si no está asignada (solo al crear)
+            const currentAccount = activeAccount || (accounts.length > 0 ? accounts[0].address : undefined)
             const updatedLog = {
               ...log,
               title: log.avisoSalida?.actividad.lugarDestino || log.title || 'Nueva Bitácora',
               location: log.avisoSalida?.actividad.regionDestino || '',
               mountainName: log.avisoSalida?.actividad.lugarDestino || '',
-              // Asignar cuenta si no está asignada (solo al crear)
+              // Asignar cuenta activa si no está asignada (solo al crear)
               relatedAccount: log.relatedAccount || currentAccount,
             }
             setLog(updatedLog)
@@ -1323,7 +1324,7 @@ export default function MountainLogDetail() {
                     Cuenta asociada a esta bitácora
                   </Label>
                   <Select
-                    value={log.relatedAccount || accounts[0]?.address || ''}
+                    value={log.relatedAccount || activeAccount || accounts[0]?.address || ''}
                     onValueChange={handleChangeAccount}
                   >
                     <SelectTrigger id="account-selector">
@@ -1904,7 +1905,7 @@ export default function MountainLogDetail() {
               Información completa del aviso de salida registrado
             </DialogDescription>
           </DialogHeader>
-          {log.avisoSalida && <AvisoSalidaView avisoSalida={log.avisoSalida} />}
+          {log.avisoSalida && <AvisoSalidaView avisoSalida={log.avisoSalida} relatedAccount={log.relatedAccount} />}
         </DialogContent>
       </Dialog>
 

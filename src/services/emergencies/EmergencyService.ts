@@ -174,6 +174,36 @@ export async function submitEmergencyToBlockchain(
   emergency: Emergency,
   logData?: Parameters<typeof prepareEmergencyRemarkData>[1]
 ): Promise<EmergencySubmissionResult> {
+  // PROTECCIÓN: Verificar que la emergencia no haya sido enviada ya
+  if (emergency.blockchainTxHash) {
+    console.warn('[EmergencyService] ⚠️ Emergencia ya enviada anteriormente:', {
+      emergencyId: emergency.emergencyId,
+      txHash: emergency.blockchainTxHash,
+      blockNumber: emergency.blockchainBlockNumber,
+    })
+    return {
+      success: true,
+      txHash: emergency.blockchainTxHash,
+      blockNumber: emergency.blockchainBlockNumber,
+      extrinsicIndex: emergency.blockchainExtrinsicIndex,
+    }
+  }
+
+  // PROTECCIÓN: Verificar que no esté en estado submitted
+  if (emergency.status === 'submitted' && emergency.submittedAt) {
+    console.warn('[EmergencyService] ⚠️ Emergencia ya está en estado submitted:', {
+      emergencyId: emergency.emergencyId,
+      status: emergency.status,
+      submittedAt: emergency.submittedAt,
+    })
+    return {
+      success: true,
+      txHash: emergency.blockchainTxHash,
+      blockNumber: emergency.blockchainBlockNumber,
+      extrinsicIndex: emergency.blockchainExtrinsicIndex,
+    }
+  }
+
   try {
     // Preparar datos del remark (incluye datos de bitácora si están disponibles)
     const remarkData = prepareEmergencyRemarkData(emergency, logData)

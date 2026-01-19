@@ -16,12 +16,17 @@ import {
   Clock
 } from 'lucide-react'
 import type { MountainLog } from '@/types/mountainLogs'
+import { useKeyringContext } from '@/contexts/KeyringContext'
+import Identicon from '@polkadot/react-identicon'
 
 interface AvisoSalidaViewProps {
   avisoSalida: NonNullable<MountainLog['avisoSalida']>
+  relatedAccount?: string // Cuenta asociada a la bitácora
 }
 
-export function AvisoSalidaView({ avisoSalida }: AvisoSalidaViewProps) {
+export function AvisoSalidaView({ avisoSalida, relatedAccount }: AvisoSalidaViewProps) {
+  const { accounts } = useKeyringContext()
+  
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('es-ES', {
       year: 'numeric',
@@ -36,6 +41,45 @@ export function AvisoSalidaView({ avisoSalida }: AvisoSalidaViewProps) {
 
   return (
     <div className="space-y-6 pb-6">
+      {/* Cuenta asociada a la bitácora */}
+      {relatedAccount && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-base">Cuenta asociada a esta bitácora</CardTitle>
+            <CardDescription>
+              La cuenta está asociada permanentemente a esta bitácora y al aviso de salida.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              {(() => {
+                const account = accounts.find(acc => acc.address === relatedAccount)
+                return account ? (
+                  <>
+                    <Identicon
+                      value={account.address}
+                      size={20}
+                      theme="polkadot"
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">
+                        {account.meta.name || 'Sin nombre'}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {account.address.substring(0, 8)}...{account.address.slice(-8)}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-sm font-mono">
+                    {relatedAccount.substring(0, 8)}...{relatedAccount.slice(-8)}
+                  </span>
+                )
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Datos del Guía */}
       <Card>
         <CardHeader>
