@@ -140,8 +140,8 @@ export async function submitEmergencyToBlockchain(
     // ...
   }
   
-  // 4. Crear transacción system.remark
-  const tx = client.tx.system.remark(remarkString)
+  // 4. Crear transacción system.remarkWithEvent (emite evento System.Remarked)
+  const tx = client.tx.system.remarkWithEvent(remarkString)
   
   // 5. Firmar y enviar
   const txHash = await tx.signAndSend(pair)

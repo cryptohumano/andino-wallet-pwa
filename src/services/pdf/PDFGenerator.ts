@@ -53,11 +53,11 @@ export async function generatePDF(options: PDFGenerationOptions): Promise<{
   // Configurar metadata del PDF (esto se incluye en las propiedades del PDF)
   pdf.setProperties({
     title: metadata.title || 'Documento',
-    author: metadata.author || 'Aura Wallet', // Este autor aparecerá en las propiedades del PDF
+    author: metadata.author || 'Andino Wallet', // Este autor aparecerá en las propiedades del PDF
     subject: metadata.subject || '',
     keywords: metadata.keywords?.join(', ') || '',
-    creator: metadata.creator || 'Aura Wallet',
-    producer: metadata.producer || 'Aura Wallet PDF Generator',
+    creator: metadata.creator || 'Andino Wallet',
+    producer: metadata.producer || 'Andino Wallet PDF Generator',
   })
 
   // Inyectar metadata GPS si está disponible
@@ -199,8 +199,8 @@ export async function generateSimplePDF(
       subject: metadata?.subject || '',
       keywords: metadata?.keywords || [],
       language: metadata?.language || 'es',
-      creator: 'Aura Wallet',
-      producer: 'Aura Wallet PDF Generator',
+      creator: 'Andino Wallet',
+      producer: 'Andino Wallet PDF Generator',
       createdAt: new Date().toISOString(),
     },
     content: {
@@ -242,8 +242,8 @@ export async function generateContractPDF(
       subject: 'Contrato',
       keywords: ['contrato', 'legal', ...(metadata?.keywords || [])],
       language: metadata?.language || 'es',
-      creator: 'Aura Wallet',
-      producer: 'Aura Wallet PDF Generator',
+      creator: 'Andino Wallet',
+      producer: 'Andino Wallet PDF Generator',
       createdAt: new Date().toISOString(),
     },
     content: {

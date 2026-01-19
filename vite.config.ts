@@ -145,10 +145,10 @@ export default defineConfig({
         ]
       },
       manifest: {
-        name: 'Aura Wallet',
-        short_name: 'Aura Wallet',
-        description: 'Wallet criptográfica segura y privada para redes Substrate/Polkadot con WebAuthn, multi-cadena y gestión de identidad',
-        theme_color: '#6366f1',
+        name: 'Andino Wallet',
+        short_name: 'Andino Wallet',
+        description: 'Wallet especializada para montañistas con bitácoras, emergencias y gestión blockchain',
+        theme_color: '#059669',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'any',

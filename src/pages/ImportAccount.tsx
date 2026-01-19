@@ -223,9 +223,9 @@ export default function ImportAccount() {
                 password || undefined
               )
             } else {
-              // Verificar si podría ser un backup completo de Aura Wallet
+              // Verificar si podría ser un backup completo de Andino Wallet
               if (parsed.version || (parsed.accounts && Array.isArray(parsed.accounts))) {
-                setError('Este parece ser un archivo de backup completo de Aura Wallet. Por favor, usa la opción "Importar Backup Completo" desde la pantalla de inicio o desde Configuración > Seguridad > Backup e Importación.')
+                setError('Este parece ser un archivo de backup completo de Andino Wallet. Por favor, usa la opción "Importar Backup Completo" desde la pantalla de inicio o desde Configuración > Seguridad > Backup e Importación.')
               } else {
                 setError('El JSON debe ser un archivo de Polkadot.js (con address y encoded) o contener "mnemonic", "uri" o "seed"')
               }

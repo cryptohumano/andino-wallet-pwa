@@ -61,6 +61,7 @@ export async function saveTransaction(txData: StoredTransaction): Promise<void> 
     txHash: txData.txHash,
     blockHash: txData.blockHash,
     blockNumber: txData.blockNumber,
+    extrinsicIndex: txData.extrinsicIndex,
     nonce: txData.nonce,
     tip: txData.tip,
     fee: txData.fee,

@@ -125,8 +125,8 @@ export default function Documents() {
           subject: 'Prueba',
           keywords: ['test', 'prueba'],
           language: 'es',
-          creator: 'Aura Wallet',
-          producer: 'Aura Wallet PDF Generator',
+          creator: 'Andino Wallet',
+          producer: 'Andino Wallet PDF Generator',
           createdAt: new Date().toISOString(),
         },
         pdfContent: {
@@ -135,7 +135,7 @@ export default function Documents() {
           sections: [
             {
               title: 'Información',
-              content: 'Este es un documento PDF de prueba generado por Aura Wallet. El sistema de documentos está funcionando correctamente.',
+              content: 'Este es un documento PDF de prueba generado por Andino Wallet. El sistema de documentos está funcionando correctamente.',
             },
             {
               title: 'Detalles del Autor',

@@ -121,7 +121,7 @@ export default function Home() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Aura Wallet</h1>
+        <h1 className="text-3xl font-bold">Andino Wallet</h1>
         <p className="text-muted-foreground mt-2">
           Tu wallet criptográfica con capacidades avanzadas
         </p>

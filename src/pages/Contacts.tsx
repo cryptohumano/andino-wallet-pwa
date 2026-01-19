@@ -29,7 +29,7 @@ interface Contact {
 }
 
 // Simulación de almacenamiento en IndexedDB (temporal, hasta que se implemente la DB completa)
-const CONTACTS_STORAGE_KEY = 'aura-wallet-contacts'
+const CONTACTS_STORAGE_KEY = 'andino-wallet-contacts'
 
 function useContactsStorage() {
   const [contacts, setContacts] = useState<Contact[]>([])

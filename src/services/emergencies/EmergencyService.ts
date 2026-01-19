@@ -1,6 +1,7 @@
 /**
  * Servicio para manejar emergencias
- * Envía emergencias a blockchain usando system.remark
+ * Envía emergencias a blockchain usando system.remarkWithEvent
+ * (emite evento System.Remarked para facilitar la escucha)
  */
 
 import { DedotClient } from 'dedot'
@@ -163,7 +164,9 @@ export function prepareEmergencyRemarkData(
 }
 
 /**
- * Envía una emergencia a blockchain usando system.remark
+ * Envía una emergencia a blockchain usando system.remarkWithEvent
+ * Este método emite un evento System.Remarked que facilita la escucha
+ * y monitoreo de emergencias en la blockchain
  */
 export async function submitEmergencyToBlockchain(
   client: DedotClient,
@@ -186,6 +189,24 @@ export async function submitEmergencyToBlockchain(
       type: emergency.type,
       severity: emergency.severity,
       remarkLength: remarkString.length,
+      // Datos incluidos en el remark
+      datosIncluidos: {
+        gps: {
+          lat: remarkData.location.latitude,
+          lon: remarkData.location.longitude,
+          alt: remarkData.location.altitude,
+          accuracy: remarkData.location.accuracy,
+        },
+        descripcion: remarkData.description.substring(0, 50) + '...',
+        tieneMetadata: !!remarkData.metadata,
+        metadataKeys: remarkData.metadata ? Object.keys(remarkData.metadata) : [],
+        tieneBitacora: !!(remarkData.metadata?.logTitle || remarkData.metadata?.mountainName),
+        tieneAvisoSalida: !!remarkData.metadata?.avisoSalida,
+        tieneTrail: !!remarkData.metadata?.trail,
+        tieneMilestone: !!remarkData.metadata?.milestone,
+      },
+      // Preview del remark (primeros 200 caracteres)
+      remarkPreview: remarkString.substring(0, 200) + '...',
     })
     
     // Verificar que el remark no sea demasiado largo
@@ -236,8 +257,8 @@ export async function submitEmergencyToBlockchain(
       }
     }
     
-    // Crear transacción system.remark
-    const tx = client.tx.system.remark(remarkString)
+    // Crear transacción system.remarkWithEvent (emite evento System.Remarked)
+    const tx = client.tx.system.remarkWithEvent(remarkString)
     
     // Firmar y enviar usando el mismo patrón que Send.tsx
     let txHash: string | undefined

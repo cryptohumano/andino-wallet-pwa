@@ -32,7 +32,7 @@ interface ApiConfig {
 }
 
 // Simulación de almacenamiento (temporal, hasta que se implemente la DB completa)
-const API_CONFIGS_STORAGE_KEY = 'aura-wallet-api-configs'
+const API_CONFIGS_STORAGE_KEY = 'andino-wallet-api-configs'
 
 function useApiConfigsStorage() {
   const [configs, setConfigs] = useState<ApiConfig[]>([])
@@ -194,7 +194,7 @@ export default function Settings() {
       <div>
         <h1 className="text-3xl font-bold">Configuración</h1>
         <p className="text-muted-foreground mt-2">
-          Gestiona la configuración de Aura Wallet
+          Gestiona la configuración de Andino Wallet
         </p>
       </div>
 

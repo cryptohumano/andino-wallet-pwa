@@ -29,8 +29,8 @@ export interface BackupData {
 }
 
 const BACKUP_VERSION = '1.1.0' // Incrementado para incluir bitácoras y documentos
-const CONTACTS_STORAGE_KEY = 'aura-wallet-contacts'
-const API_CONFIGS_STORAGE_KEY = 'aura-wallet-api-configs'
+const CONTACTS_STORAGE_KEY = 'andino-wallet-contacts'
+const API_CONFIGS_STORAGE_KEY = 'andino-wallet-api-configs'
 
 /**
  * Sanitiza una bitácora removiendo base64 de imágenes si no se incluyen
@@ -323,8 +323,8 @@ export async function downloadBackup(options: {
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
-            title: 'Aura Wallet Backup',
-            text: 'Respaldo de mi wallet Aura',
+            title: 'Andino Wallet Backup',
+            text: 'Respaldo de mi wallet Andino',
           })
           console.log('[Backup] ✅ Backup compartido usando Share API')
           return
@@ -400,7 +400,7 @@ export function readBackupFile(file: File): Promise<BackupData> {
         const parsed = JSON.parse(text)
         
         // Verificar si es un backup de Polkadot.js (tiene 'encoded' y 'accounts' array)
-        // Si es así, no es un backup de Aura Wallet, rechazarlo con un mensaje apropiado
+        // Si es así, no es un backup de Andino Wallet, rechazarlo con un mensaje apropiado
         if (parsed.encoded && Array.isArray(parsed.accounts) && parsed.encoding) {
           throw new Error('Este es un archivo de backup de Polkadot.js. Por favor, usa la opción "Importar Cuenta" > "Archivo JSON" para importarlo.')
         }

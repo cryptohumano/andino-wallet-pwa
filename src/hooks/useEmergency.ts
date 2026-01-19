@@ -171,6 +171,7 @@ export function useEmergency() {
             txHash: result.txHash,
             blockHash: undefined,
             blockNumber: result.blockNumber,
+            extrinsicIndex: result.extrinsicIndex,
             nonce: undefined,
             tip: undefined,
             fee: undefined,

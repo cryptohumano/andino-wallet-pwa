@@ -16,7 +16,7 @@ interface ActiveAccountContextType {
 
 const ActiveAccountContext = createContext<ActiveAccountContextType | undefined>(undefined)
 
-const ACTIVE_ACCOUNT_STORAGE_KEY = 'aura-wallet-active-account'
+const ACTIVE_ACCOUNT_STORAGE_KEY = 'andino-wallet-active-account'
 
 export function ActiveAccountProvider({ children }: { children: ReactNode }) {
   const { accounts } = useKeyringContext()
