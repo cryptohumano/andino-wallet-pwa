@@ -44,7 +44,37 @@ export function useEmergency() {
    */
   const createAndSubmitEmergency = useCallback(async (
     data: CreateEmergencyData,
-    accountAddress?: string
+    accountAddress?: string,
+    logData?: {
+      title?: string
+      mountainName?: string
+      location?: string
+      startDate?: number
+      avisoSalida?: {
+        guia?: {
+          nombres?: string
+          apellidos?: string
+        }
+        actividad?: {
+          lugarDestino?: string
+          numeroParticipantes?: number
+          fechaSalida?: number
+          tipoActividad?: string
+        }
+      }
+      routes?: Array<{
+        name?: string
+        distance?: number
+      }>
+      milestones?: Array<{
+        id: string
+        title?: string
+        type?: string
+        metadata?: {
+          elevation?: number
+        }
+      }>
+    }
   ): Promise<Emergency | null> => {
     if (!isUnlocked || accounts.length === 0) {
       toast.error('Debes desbloquear la wallet y tener una cuenta activa')
