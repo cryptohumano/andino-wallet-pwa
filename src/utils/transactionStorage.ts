@@ -86,7 +86,13 @@ export async function saveTransaction(txData: StoredTransaction): Promise<void> 
     const request = store.put(cleanTxData)
 
     request.onsuccess = () => {
-      console.log(`[Transaction Storage] ✅ Request de guardado exitoso para: ${txData.id}`)
+      console.log(`[Transaction Storage] ✅ Request de guardado exitoso para: ${txData.id}`, {
+        id: cleanTxData.id,
+        txHash: cleanTxData.txHash,
+        type: cleanTxData.type,
+        hasMetadata: !!cleanTxData.metadata,
+        metadata: cleanTxData.metadata,
+      })
     }
     
     request.onerror = () => {
@@ -96,7 +102,13 @@ export async function saveTransaction(txData: StoredTransaction): Promise<void> 
 
     // Esperar a que la transacción se complete
     dbTransaction.oncomplete = () => {
-      console.log(`[Transaction Storage] ✅ Transacción completada - Transacción guardada: ${txData.id}`)
+      console.log(`[Transaction Storage] ✅ Transacción completada - Transacción guardada: ${txData.id}`, {
+        id: cleanTxData.id,
+        txHash: cleanTxData.txHash,
+        type: cleanTxData.type,
+        hasMetadata: !!cleanTxData.metadata,
+        metadata: cleanTxData.metadata,
+      })
       resolve()
     }
     
@@ -109,7 +121,7 @@ export async function saveTransaction(txData: StoredTransaction): Promise<void> 
 }
 
 /**
- * Obtiene una transacción por su hash
+ * Obtiene una transacción por su hash (o ID, ya que son el mismo)
  */
 export async function getTransaction(txHash: string): Promise<StoredTransaction | null> {
   const db = await openDB()
@@ -123,9 +135,23 @@ export async function getTransaction(txHash: string): Promise<StoredTransaction 
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], 'readonly')
     const store = transaction.objectStore(STORE_NAME)
+    // El id es la clave primaria, y normalmente es igual al txHash
     const request = store.get(txHash)
 
-    request.onsuccess = () => resolve(request.result || null)
+    request.onsuccess = () => {
+      const result = request.result || null
+      if (result) {
+        console.log(`[Transaction Storage] ✅ Transacción encontrada: ${txHash}`, {
+          id: result.id,
+          txHash: result.txHash,
+          hasMetadata: !!result.metadata,
+          metadata: result.metadata,
+        })
+      } else {
+        console.warn(`[Transaction Storage] ⚠️ Transacción no encontrada: ${txHash}`)
+      }
+      resolve(result)
+    }
     request.onerror = () => reject(request.error)
   })
 }

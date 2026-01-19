@@ -225,6 +225,12 @@ export default defineConfig({
         global: 'globalThis',
       },
     },
+    include: ['buffer'],
+  },
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
   },
 })
 

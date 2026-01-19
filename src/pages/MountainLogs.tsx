@@ -5,8 +5,11 @@ import { Badge } from '@/components/ui/badge'
 import { 
   getAllMountainLogs, 
   getMountainLogsByStatus,
+  getMountainLogsByAccount,
   deleteMountainLog
 } from '@/utils/mountainLogStorage'
+import { useKeyringContext } from '@/contexts/KeyringContext'
+import { useActiveAccount } from '@/contexts/ActiveAccountContext'
 import type { MountainLog, MountainLogStatus } from '@/types/mountainLogs'
 import { Mountain, Plus, Filter, Search, Trash2, MapPin, Calendar, Clock } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -22,24 +25,40 @@ import {
 
 export default function MountainLogs() {
   const navigate = useNavigate()
+  const { accounts } = useKeyringContext()
+  const { activeAccount } = useActiveAccount()
   const [logs, setLogs] = useState<MountainLog[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<MountainLogStatus | 'all'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [filterAccount, setFilterAccount] = useState<string>('all')
 
+  // Actualizar filtro de cuenta cuando cambia la cuenta activa
   useEffect(() => {
-    loadLogs()
-  }, [filterStatus])
+    if (activeAccount) {
+      // Si hay cuenta activa, actualizar el filtro automáticamente
+      setFilterAccount(activeAccount)
+    }
+  }, [activeAccount])
 
   const loadLogs = async () => {
     try {
       setLoading(true)
       let loadedLogs: MountainLog[]
       
-      if (filterStatus === 'all') {
-        loadedLogs = await getAllMountainLogs()
+      // Prioridad: usar activeAccount si está disponible (más reciente), sino usar filterAccount
+      // Esto asegura que cuando cambia activeAccount, se use inmediatamente
+      const accountToFilter = activeAccount || (filterAccount !== 'all' ? filterAccount : null)
+      
+      if (accountToFilter) {
+        loadedLogs = await getMountainLogsByAccount(accountToFilter)
       } else {
-        loadedLogs = await getMountainLogsByStatus(filterStatus)
+        loadedLogs = await getAllMountainLogs()
+      }
+      
+      // Luego filtrar por estado si no es 'all'
+      if (filterStatus !== 'all') {
+        loadedLogs = loadedLogs.filter(log => log.status === filterStatus)
       }
       
       setLogs(loadedLogs)
@@ -50,6 +69,12 @@ export default function MountainLogs() {
       setLoading(false)
     }
   }
+
+  // Recargar bitácoras cuando cambia el estado, el filtro de cuenta o la cuenta activa
+  useEffect(() => {
+    loadLogs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterStatus, filterAccount, activeAccount])
 
   const filteredLogs = logs.filter(log => {
     if (!searchQuery) return true
@@ -169,6 +194,26 @@ export default function MountainLogs() {
                 />
               </div>
             </div>
+            
+            {/* Selector de cuenta (solo si hay más de una cuenta) */}
+            {accounts.length > 1 && (
+              <div className="w-full sm:w-64">
+                <Select value={filterAccount} onValueChange={setFilterAccount}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrar por cuenta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las cuentas</SelectItem>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.address} value={account.address}>
+                        {account.meta.name || `${account.address.slice(0, 8)}...`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            
             <div className="flex gap-2 flex-wrap">
               <Button
                 variant={filterStatus === 'all' ? 'default' : 'outline'}

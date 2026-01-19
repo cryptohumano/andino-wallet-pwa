@@ -18,6 +18,8 @@ import type { MountainLog } from '@/types/mountainLogs'
 import { fillDummyData } from '@/data/dummyAvisoSalida'
 import { toast } from 'sonner'
 import { DummyDataSummary } from './DummyDataSummary'
+import { useKeyringContext } from '@/contexts/KeyringContext'
+import Identicon from '@polkadot/react-identicon'
 
 interface AvisoSalidaFormProps {
   log: MountainLog
@@ -28,6 +30,7 @@ interface AvisoSalidaFormProps {
 export function AvisoSalidaForm({ log, onUpdate, onComplete }: AvisoSalidaFormProps) {
   const [currentSection, setCurrentSection] = useState(1)
   const [showDummySummary, setShowDummySummary] = useState(false)
+  const { accounts } = useKeyringContext()
   
   // Usar el avisoSalida del log actualizado
   const avisoSalida = log.avisoSalida || {
@@ -237,6 +240,117 @@ export function AvisoSalidaForm({ log, onUpdate, onComplete }: AvisoSalidaFormPr
           </Button>
         </div>
       </div>
+
+      {/* Selector de cuenta - Solo mostrar si hay más de una cuenta Y la bitácora aún no tiene cuenta asignada */}
+      {accounts.length > 1 && !log.relatedAccount && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-base">Cuenta asociada a esta bitácora</CardTitle>
+            <CardDescription>
+              Selecciona la cuenta que estará asociada permanentemente a esta bitácora y al aviso de salida. No se podrá cambiar después.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label htmlFor="account-selector-aviso">Cuenta</Label>
+              <Select
+                value={log.relatedAccount || accounts[0]?.address || ''}
+                onValueChange={(newAccountAddress) => {
+                  onUpdate({
+                    ...log,
+                    relatedAccount: newAccountAddress,
+                    updatedAt: Date.now(),
+                  })
+                }}
+              >
+                <SelectTrigger id="account-selector-aviso">
+                  <SelectValue>
+                    {log.relatedAccount
+                      ? (() => {
+                          const account = accounts.find(acc => acc.address === log.relatedAccount)
+                          return account ? (
+                            <div className="flex items-center gap-2">
+                              <Identicon
+                                value={account.address}
+                                size={16}
+                                theme="polkadot"
+                              />
+                              <span>{account.meta.name || 'Sin nombre'}</span>
+                            </div>
+                          ) : `${log.relatedAccount.substring(0, 8)}...`
+                        })()
+                      : 'Seleccionar cuenta'}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.address} value={account.address}>
+                      <div className="flex items-center gap-2">
+                        <Identicon
+                          value={account.address}
+                          size={16}
+                          theme="polkadot"
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {account.meta.name || 'Sin nombre'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {account.address.substring(0, 8)}...{account.address.slice(-8)}
+                          </span>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Esta cuenta se usará para firmar emergencias y documentos relacionados con esta bitácora.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Mostrar cuenta actual si ya está asignada (solo lectura) */}
+      {log.relatedAccount && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-base">Cuenta asociada a esta bitácora</CardTitle>
+            <CardDescription>
+              La cuenta está asociada permanentemente a esta bitácora y no se puede cambiar.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              {(() => {
+                const account = accounts.find(acc => acc.address === log.relatedAccount)
+                return account ? (
+                  <>
+                    <Identicon
+                      value={account.address}
+                      size={20}
+                      theme="polkadot"
+                    />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">
+                        {account.meta.name || 'Sin nombre'}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {account.address.substring(0, 8)}...{account.address.slice(-8)}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-sm font-mono">
+                    {log.relatedAccount.substring(0, 8)}...{log.relatedAccount.slice(-8)}
+                  </span>
+                )
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Sección 1: Datos del Guía */}
       {currentSection === 1 && (

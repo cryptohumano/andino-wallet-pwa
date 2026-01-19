@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { 
   getAllDocuments, 
-  getDocumentsByType, 
+  getDocumentsByType,
+  getDocumentsByAccount,
   type Document 
 } from '@/utils/documentStorage'
 import { FileText, Plus, Filter, Search, Trash2 } from 'lucide-react'
@@ -12,6 +13,7 @@ import { deleteDocument } from '@/utils/documentStorage'
 import { Input } from '@/components/ui/input'
 import { createDocument } from '@/services/documents/DocumentService'
 import { useKeyringContext } from '@/contexts/KeyringContext'
+import { useActiveAccount } from '@/contexts/ActiveAccountContext'
 import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { downloadPDF, openPDFInNewTab } from '@/utils/pdfUtils'
@@ -36,6 +38,7 @@ import Identicon from '@polkadot/react-identicon'
 
 export default function Documents() {
   const { accounts } = useKeyringContext()
+  const { activeAccount } = useActiveAccount()
   const navigate = useNavigate()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,26 +48,34 @@ export default function Documents() {
   const [selectedAccount, setSelectedAccount] = useState<string>('')
   const [dialogOpen, setDialogOpen] = useState(false)
 
+  // Usar cuenta activa como default
   useEffect(() => {
-    loadDocuments()
-  }, [filterType])
-
-  useEffect(() => {
-    // Establecer la primera cuenta como predeterminada
-    if (accounts.length > 0 && !selectedAccount) {
+    if (activeAccount) {
+      setSelectedAccount(activeAccount)
+    } else if (accounts.length > 0 && !selectedAccount) {
       setSelectedAccount(accounts[0].address)
     }
-  }, [accounts, selectedAccount])
+  }, [activeAccount, accounts])
 
   const loadDocuments = async () => {
     try {
       setLoading(true)
       let docs: Document[]
       
-      if (filterType === 'all') {
-        docs = await getAllDocuments()
+      // Si hay cuenta activa, filtrar por cuenta activa
+      if (activeAccount) {
+        if (filterType === 'all') {
+          docs = await getDocumentsByAccount(activeAccount)
+        } else {
+          const allDocs = await getDocumentsByType(filterType)
+          docs = allDocs.filter(doc => doc.relatedAccount === activeAccount)
+        }
       } else {
-        docs = await getDocumentsByType(filterType)
+        if (filterType === 'all') {
+          docs = await getAllDocuments()
+        } else {
+          docs = await getDocumentsByType(filterType)
+        }
       }
       
       setDocuments(docs)
@@ -74,6 +85,12 @@ export default function Documents() {
       setLoading(false)
     }
   }
+
+  // Recargar documentos cuando cambia la cuenta activa o el tipo de filtro
+  useEffect(() => {
+    loadDocuments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, activeAccount])
 
   const getAccountDisplayName = (address: string) => {
     const account = accounts.find(acc => acc.address === address)

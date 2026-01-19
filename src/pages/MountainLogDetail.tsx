@@ -53,6 +53,8 @@ import { ImageGallery } from '@/components/mountainLogs/ImageGallery'
 import { RouteMap } from '@/components/mountainLogs/RouteMap'
 import PhotoCapture from '@/components/documents/PhotoCapture'
 import { generateMountainLogPDF } from '@/services/mountainLogs/mountainLogPDFGenerator'
+import { EmergencyButton } from '@/components/emergencies/EmergencyButton'
+import { EmergencyPanel } from '@/components/emergencies/EmergencyPanel'
 import { downloadPDF } from '@/utils/pdfUtils'
 import SignatureSelector from '@/components/signatures/SignatureSelector'
 import type { Document } from '@/types/documents'
@@ -126,6 +128,9 @@ export default function MountainLogDetail() {
       loadLog()
     } else {
       // Crear nueva bitácora - mostrar formulario de Aviso de Salida
+      // Asignar la cuenta actual (primera cuenta disponible o seleccionada)
+      const currentAccount = accounts.length > 0 ? accounts[0].address : undefined
+      
       const newLog: MountainLog = {
         logId: uuidv4(),
         title: 'Nueva Bitácora',
@@ -141,7 +146,8 @@ export default function MountainLogDetail() {
         entries: [],
         images: [],
         gpsPoints: [],
-        synced: false
+        synced: false,
+        relatedAccount: currentAccount // Asignar cuenta al crear
       }
       setLog(newLog)
       // Mostrar planeación primero (opcional)
@@ -194,6 +200,33 @@ export default function MountainLogDetail() {
     } catch (error) {
       console.error('Error al guardar bitácora:', error)
       toast.error('Error al guardar la bitácora')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleChangeAccount = async (newAccountAddress: string) => {
+    if (!log) return
+
+    // REGLA: No se puede cambiar la cuenta después de que la bitácora ya tiene una cuenta asignada
+    if (log.relatedAccount) {
+      toast.error('No se puede cambiar la cuenta de una bitácora después de crearla. La cuenta está asociada permanentemente a la bitácora y al aviso de salida.')
+      return
+    }
+
+    try {
+      setSaving(true)
+      const updatedLog: MountainLog = {
+        ...log,
+        relatedAccount: newAccountAddress,
+        updatedAt: Date.now(),
+      }
+      await saveMountainLog(updatedLog)
+      setLog(updatedLog)
+      toast.success('Cuenta asociada a la bitácora')
+    } catch (error) {
+      console.error('Error al cambiar cuenta de la bitácora:', error)
+      toast.error('Error al cambiar la cuenta')
     } finally {
       setSaving(false)
     }
@@ -1190,16 +1223,18 @@ export default function MountainLogDetail() {
             
             setShowAvisoSalida(false)
             // Actualizar título con lugar de destino si existe
-            if (log.avisoSalida?.actividad.lugarDestino) {
-              const updatedLog = {
-                ...log,
-                title: log.avisoSalida.actividad.lugarDestino || log.title || 'Nueva Bitácora',
-                location: log.avisoSalida.actividad.regionDestino || '',
-                mountainName: log.avisoSalida.actividad.lugarDestino || ''
-              }
-              setLog(updatedLog)
-              await saveMountainLog(updatedLog)
+            // REGLA: Asignar cuenta automáticamente si no está asignada (solo al crear)
+            const currentAccount = accounts.length > 0 ? accounts[0].address : undefined
+            const updatedLog = {
+              ...log,
+              title: log.avisoSalida?.actividad.lugarDestino || log.title || 'Nueva Bitácora',
+              location: log.avisoSalida?.actividad.regionDestino || '',
+              mountainName: log.avisoSalida?.actividad.lugarDestino || '',
+              // Asignar cuenta si no está asignada (solo al crear)
+              relatedAccount: log.relatedAccount || currentAccount,
             }
+            setLog(updatedLog)
+            await saveMountainLog(updatedLog)
             navigate(`/mountain-logs/${log.logId}`)
           }}
         />
@@ -1277,6 +1312,105 @@ export default function MountainLogDetail() {
 
       {/* Contenido principal - Timeline de milestones */}
       <div className="px-4 py-6 space-y-6">
+        {/* Selector de cuenta - Solo mostrar si hay más de una cuenta Y la bitácora aún no tiene cuenta asignada (solo al crear) */}
+        {/* REGLA: No se puede cambiar la cuenta después de crear la bitácora */}
+        {accounts.length > 1 && log && !log.relatedAccount && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="account-selector" className="text-sm font-medium mb-2 block">
+                    Cuenta asociada a esta bitácora
+                  </Label>
+                  <Select
+                    value={log.relatedAccount || accounts[0]?.address || ''}
+                    onValueChange={handleChangeAccount}
+                  >
+                    <SelectTrigger id="account-selector">
+                      <SelectValue>
+                        {log.relatedAccount
+                          ? accounts.find(acc => acc.address === log.relatedAccount)?.meta.name || 
+                            `${log.relatedAccount.substring(0, 8)}...`
+                          : 'Seleccionar cuenta'}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.address} value={account.address}>
+                          {account.meta.name || 'Sin nombre'} - {account.address.substring(0, 8)}...
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Esta cuenta se asociará permanentemente a esta bitácora y al aviso de salida. No se podrá cambiar después.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Mostrar cuenta actual si ya está asignada (solo lectura) */}
+        {log && log.relatedAccount && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <Label className="text-sm font-medium mb-2 block">
+                    Cuenta asociada a esta bitácora
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">
+                      {accounts.find(acc => acc.address === log.relatedAccount)?.meta.name || 'Sin nombre'}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {log.relatedAccount.substring(0, 8)}...{log.relatedAccount.slice(-8)}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    La cuenta está asociada permanentemente a esta bitácora y no se puede cambiar.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Panel de Emergencias - Muestra emergencias activas (solo si hay milestones) */}
+        <EmergencyPanel 
+          logId={log.logId}
+          log={log}
+          onEmergencyUpdate={() => {
+            // Recargar si es necesario
+            console.log('[MountainLogDetail] Emergencia actualizada')
+          }}
+        />
+
+        {/* Botón de Emergencia - Siempre visible cuando hay bitácora activa */}
+        {!isReadOnly && (
+          <Card className="border-destructive/50 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-destructive mb-1">¿Necesitas ayuda de emergencia?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Si estás en una situación de emergencia, presiona el botón para enviar una alerta a la blockchain.
+                  </p>
+                </div>
+                <EmergencyButton 
+                  log={log}
+                  currentLocation={currentLocation}
+                  onEmergencyCreated={(emergencyId) => {
+                    console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
+                    toast.info('Emergencia activa. Revisa el estado en el panel de emergencias.')
+                  }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Mapa de la ruta - Solo mostrar si la bitácora está finalizada */}
         {isReadOnly && (
           <RouteMap log={log} />

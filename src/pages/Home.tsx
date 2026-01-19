@@ -3,18 +3,20 @@ import { Button } from '@/components/ui/button'
 import { Wallet, Send, QrCode, ArrowRight, Copy, Check, Download, Key, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useKeyringContext } from '@/contexts/KeyringContext'
+import { useActiveAccount } from '@/contexts/ActiveAccountContext'
 import { useState, useEffect } from 'react'
 import Identicon from '@polkadot/react-identicon'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { useCurrentChainBalance } from '@/hooks/useMultiChainBalances'
 import { useNetwork } from '@/contexts/NetworkContext'
 import { formatBalanceForDisplay, getChainSymbol } from '@/utils/balance'
-import { getAllTransactions, type StoredTransaction } from '@/utils/transactionStorage'
+import { getTransactionsByAccount, type StoredTransaction } from '@/utils/transactionStorage'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale/es'
 
 export default function Home() {
   const { accounts } = useKeyringContext()
+  const { activeAccount } = useActiveAccount()
   const { selectedChain } = useNetwork()
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null)
   const [totalBalance, setTotalBalance] = useState<bigint>(BigInt(0))
@@ -22,7 +24,7 @@ export default function Home() {
   const [recentTransactions, setRecentTransactions] = useState<StoredTransaction[]>([])
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
 
-  // Calcular balance total de todas las cuentas
+  // Calcular balance de la cuenta activa (o todas si no hay cuenta activa)
   useEffect(() => {
     if (accounts.length === 0 || !selectedChain) {
       setTotalBalance(BigInt(0))
@@ -32,8 +34,13 @@ export default function Home() {
     setIsLoadingBalance(true)
     const fetchBalances = async () => {
       try {
+        // Si hay cuenta activa, solo obtener su balance
+        const accountsToFetch = activeAccount 
+          ? accounts.filter(acc => acc.address === activeAccount)
+          : accounts
+
         const balances = await Promise.all(
-          accounts.map(async (account) => {
+          accountsToFetch.map(async (account) => {
             try {
               const provider = new (await import('dedot')).WsProvider(selectedChain.endpoint)
               await provider.connect()
@@ -63,28 +70,32 @@ export default function Home() {
     }
 
     fetchBalances()
-  }, [accounts, selectedChain])
+  }, [accounts, selectedChain, activeAccount])
 
-  // Cargar transacciones recientes
+  // Cargar transacciones recientes de la cuenta activa
   useEffect(() => {
     setIsLoadingTransactions(true)
-    getAllTransactions()
-      .then((transactions) => {
-        // Filtrar solo transacciones de las cuentas actuales
-        const accountAddresses = new Set(accounts.map(acc => acc.address))
-        const filtered = transactions
-          .filter(tx => accountAddresses.has(tx.accountAddress))
-          .slice(0, 5) // Solo las 5 más recientes
-        setRecentTransactions(filtered)
-      })
-      .catch((error) => {
-        console.error('Error loading transactions:', error)
-        setRecentTransactions([])
-      })
-      .finally(() => {
-        setIsLoadingTransactions(false)
-      })
-  }, [accounts])
+    
+    if (activeAccount) {
+      // Si hay cuenta activa, cargar solo sus transacciones
+      getTransactionsByAccount(activeAccount)
+        .then((transactions) => {
+          const filtered = transactions.slice(0, 5) // Solo las 5 más recientes
+          setRecentTransactions(filtered)
+        })
+        .catch((error) => {
+          console.error('Error loading transactions:', error)
+          setRecentTransactions([])
+        })
+        .finally(() => {
+          setIsLoadingTransactions(false)
+        })
+    } else {
+      // Si no hay cuenta activa, no mostrar transacciones
+      setRecentTransactions([])
+      setIsLoadingTransactions(false)
+    }
+  }, [activeAccount])
 
   const handleCopyAddress = async (address: string) => {
     await navigator.clipboard.writeText(address)
@@ -245,7 +256,10 @@ export default function Home() {
             </div>
           ) : (
             <div className="space-y-3">
-              {accounts.map((account) => (
+              {(activeAccount 
+                ? accounts.filter(acc => acc.address === activeAccount)
+                : accounts
+              ).map((account) => (
                 <div
                   key={account.address}
                   className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"

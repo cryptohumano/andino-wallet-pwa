@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Search, Bell, LogOut } from 'lucide-react'
 import { NetworkSwitcher } from '@/components/NetworkSwitcher'
+import { ActiveAccountSwitcher } from '@/components/ActiveAccountSwitcher'
 import { useContext } from 'react'
 import { NetworkContext } from '@/contexts/NetworkContext'
 import { KeyringContext } from '@/contexts/KeyringContext'
@@ -48,6 +49,9 @@ export function Header() {
               <h1 className="text-lg sm:text-xl font-bold truncate">Aura Wallet</h1>
             </div>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+              <div className="hidden sm:block">
+                <ActiveAccountSwitcher />
+              </div>
               <LogoutButton />
               <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10">
                 <Search className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -79,6 +83,9 @@ export function Header() {
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+            <div className="hidden sm:block">
+              <ActiveAccountSwitcher />
+            </div>
             <LogoutButton />
             <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10">
               <Search className="h-4 w-4 sm:h-5 sm:w-5" />

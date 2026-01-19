@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'pwa-substrate-keyring'
-const DB_VERSION = 8 // Incrementado para agregar store de firmas autográficas
+const DB_VERSION = 10 // Incrementado para asegurar que el store de emergencias se cree
 
 let dbInstance: IDBDatabase | null = null
 let openPromise: Promise<IDBDatabase> | null = null
@@ -18,7 +18,7 @@ export async function openSharedDB(): Promise<IDBDatabase> {
   // Si ya hay una instancia, verificar que tenga todos los stores necesarios
   if (dbInstance) {
     // Verificar que todos los stores necesarios existen
-    const requiredStores = ['encrypted-accounts', 'webauthn-credentials', 'transactions', 'documents', 'external-api-configs', 'document-queue', 'mountain-logs', 'autographic-signatures']
+    const requiredStores = ['encrypted-accounts', 'webauthn-credentials', 'transactions', 'documents', 'external-api-configs', 'document-queue', 'mountain-logs', 'autographic-signatures', 'emergencies']
     const missingStores = requiredStores.filter(store => !dbInstance.objectStoreNames.contains(store))
     if (missingStores.length > 0) {
       console.warn(`[IndexedDB Shared] ⚠️ Faltan stores: ${missingStores.join(', ')}. Cerrando conexión para forzar migración...`)
@@ -178,6 +178,7 @@ export async function openSharedDB(): Promise<IDBDatabase> {
       
       // Verificar que los stores existan
       
+      const EMERGENCIES_STORE_NAME = 'emergencies'
       const hasAccountsStore = db.objectStoreNames.contains(STORE_NAME)
       const hasWebAuthnStore = db.objectStoreNames.contains(WEBAUTHN_STORE_NAME)
       const hasTransactionsStore = db.objectStoreNames.contains(TRANSACTIONS_STORE_NAME)
@@ -186,12 +187,13 @@ export async function openSharedDB(): Promise<IDBDatabase> {
       const hasDocumentQueueStore = db.objectStoreNames.contains(DOCUMENT_QUEUE_STORE_NAME)
       const hasMountainLogsStore = db.objectStoreNames.contains(MOUNTAIN_LOGS_STORE_NAME)
       const hasAutographicSignaturesStore = db.objectStoreNames.contains(AUTOGRAPHIC_SIGNATURES_STORE_NAME)
+      const hasEmergenciesStore = db.objectStoreNames.contains(EMERGENCIES_STORE_NAME)
       const hasCorrectVersion = db.version === DB_VERSION
       
       console.log('[IndexedDB Shared] Stores disponibles:', Array.from(db.objectStoreNames))
       console.log(`[IndexedDB Shared] Versión de DB: ${db.version}, esperada: ${DB_VERSION}`)
       
-      if (!hasAccountsStore || !hasWebAuthnStore || !hasTransactionsStore || !hasDocumentsStore || !hasExternalAPIConfigsStore || !hasDocumentQueueStore || !hasMountainLogsStore || !hasAutographicSignaturesStore || !hasCorrectVersion) {
+      if (!hasAccountsStore || !hasWebAuthnStore || !hasTransactionsStore || !hasDocumentsStore || !hasExternalAPIConfigsStore || !hasDocumentQueueStore || !hasMountainLogsStore || !hasAutographicSignaturesStore || !hasEmergenciesStore || !hasCorrectVersion) {
         console.warn('[IndexedDB Shared] ⚠️ Faltan stores, cerrando y eliminando base de datos para recrearla...')
         db.close()
         dbInstance = null
@@ -292,6 +294,17 @@ export async function openSharedDB(): Promise<IDBDatabase> {
             autographicSignaturesStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
             autographicSignaturesStore.createIndex('byUpdatedAt', 'updatedAt', { unique: false })
             console.log(`[IndexedDB Shared] ObjectStore '${AUTOGRAPHIC_SIGNATURES_STORE_NAME}' creado con índices`)
+
+            // Crear store de emergencias
+            const EMERGENCIES_STORE_NAME = 'emergencies'
+            const emergenciesStore = recreateDb.createObjectStore(EMERGENCIES_STORE_NAME, { keyPath: 'emergencyId' })
+            emergenciesStore.createIndex('byAccount', 'reporterAccount', { unique: false })
+            emergenciesStore.createIndex('byStatus', 'status', { unique: false })
+            emergenciesStore.createIndex('byType', 'type', { unique: false })
+            emergenciesStore.createIndex('byRelatedLogId', 'relatedLogId', { unique: false })
+            emergenciesStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+            emergenciesStore.createIndex('byBlockchainTxHash', 'blockchainTxHash', { unique: false })
+            console.log(`[IndexedDB Shared] ObjectStore '${EMERGENCIES_STORE_NAME}' creado con índices`)
           }
         }
         
@@ -299,6 +312,58 @@ export async function openSharedDB(): Promise<IDBDatabase> {
           const error = deleteRequest.error || new Error('Error al eliminar base de datos')
           console.error('[IndexedDB Shared] ❌ Error al eliminar:', error)
           rejectOnce(error as Error)
+        }
+        
+        return // No continuar con el resolve original
+      }
+      
+      // Verificar si falta el store de emergencias
+      // Esto puede pasar si la migración falló o si se creó la versión sin el store
+      // EMERGENCIES_STORE_NAME ya está declarado arriba en la línea 181
+      if (!db.objectStoreNames.contains(EMERGENCIES_STORE_NAME)) {
+        console.warn(`[IndexedDB Shared] ⚠️ Store de emergencias falta (versión actual: ${db.version}). Forzando upgrade...`)
+        db.close()
+        dbInstance = null
+        openPromise = null
+        
+        // Reabrir con versión incrementada para forzar upgrade
+        // Siempre incrementar la versión para asegurar que onupgradeneeded se ejecute
+        const newVersion = db.version + 1
+        console.log(`[IndexedDB Shared] Forzando upgrade de versión ${db.version} a ${newVersion}`)
+        const upgradeRequest = indexedDB.open(DB_NAME, newVersion)
+        
+        upgradeRequest.onerror = () => {
+          const error = upgradeRequest.error || new Error('Error al forzar upgrade')
+          console.error('[IndexedDB Shared] ❌ Error al forzar upgrade:', error)
+          rejectOnce(error as Error)
+        }
+        
+        upgradeRequest.onsuccess = () => {
+          if (!upgradeRequest.result) {
+            rejectOnce(new Error('Upgrade exitoso pero sin resultado'))
+            return
+          }
+          console.log('[IndexedDB Shared] ✅ Upgrade forzado completado')
+          resolveOnce(upgradeRequest.result)
+        }
+        
+        upgradeRequest.onupgradeneeded = (event) => {
+          const upgradeDb = (event.target as IDBOpenDBRequest).result
+          
+          if (!upgradeDb.objectStoreNames.contains(EMERGENCIES_STORE_NAME)) {
+            try {
+              const emergenciesStore = upgradeDb.createObjectStore(EMERGENCIES_STORE_NAME, { keyPath: 'emergencyId' })
+              emergenciesStore.createIndex('byAccount', 'reporterAccount', { unique: false })
+              emergenciesStore.createIndex('byStatus', 'status', { unique: false })
+              emergenciesStore.createIndex('byType', 'type', { unique: false })
+              emergenciesStore.createIndex('byRelatedLogId', 'relatedLogId', { unique: false })
+              emergenciesStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+              emergenciesStore.createIndex('byBlockchainTxHash', 'blockchainTxHash', { unique: false })
+              console.log(`[IndexedDB Shared] ✅ ObjectStore '${EMERGENCIES_STORE_NAME}' creado en upgrade forzado`)
+            } catch (error) {
+              console.error(`[IndexedDB Shared] ❌ Error al crear store en upgrade forzado:`, error)
+            }
+          }
         }
         
         return // No continuar con el resolve original
@@ -389,6 +454,17 @@ export async function openSharedDB(): Promise<IDBDatabase> {
           autographicSignaturesStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
           autographicSignaturesStore.createIndex('byUpdatedAt', 'updatedAt', { unique: false })
           console.log(`[IndexedDB Shared] ObjectStore '${AUTOGRAPHIC_SIGNATURES_STORE_NAME}' creado con índices`)
+
+          // Crear store de emergencias
+          const EMERGENCIES_STORE_NAME = 'emergencies'
+          const emergenciesStore = db.createObjectStore(EMERGENCIES_STORE_NAME, { keyPath: 'emergencyId' })
+          emergenciesStore.createIndex('byAccount', 'reporterAccount', { unique: false })
+          emergenciesStore.createIndex('byStatus', 'status', { unique: false })
+          emergenciesStore.createIndex('byType', 'type', { unique: false })
+          emergenciesStore.createIndex('byRelatedLogId', 'relatedLogId', { unique: false })
+          emergenciesStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+          emergenciesStore.createIndex('byBlockchainTxHash', 'blockchainTxHash', { unique: false })
+          console.log(`[IndexedDB Shared] ObjectStore '${EMERGENCIES_STORE_NAME}' creado con índices`)
         } else {
           const transaction = (event.target as IDBOpenDBRequest).transaction
           if (!transaction) {
@@ -538,6 +614,50 @@ export async function openSharedDB(): Promise<IDBDatabase> {
                 console.error(`[IndexedDB Shared] ❌ Error al crear store '${AUTOGRAPHIC_SIGNATURES_STORE_NAME}':`, error)
                 throw error
               }
+            }
+          }
+
+          // Migración de versión 8 a 9: Agregar store de emergencias
+          if (oldVersion < 9) {
+            console.log('[IndexedDB Shared] Migrando de versión 8 a 9: Agregando store de emergencias...')
+            const EMERGENCIES_STORE_NAME = 'emergencies'
+            if (!db.objectStoreNames.contains(EMERGENCIES_STORE_NAME)) {
+              try {
+                const emergenciesStore = db.createObjectStore(EMERGENCIES_STORE_NAME, { keyPath: 'emergencyId' })
+                emergenciesStore.createIndex('byAccount', 'reporterAccount', { unique: false })
+                emergenciesStore.createIndex('byStatus', 'status', { unique: false })
+                emergenciesStore.createIndex('byType', 'type', { unique: false })
+                emergenciesStore.createIndex('byRelatedLogId', 'relatedLogId', { unique: false })
+                emergenciesStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+                emergenciesStore.createIndex('byBlockchainTxHash', 'blockchainTxHash', { unique: false })
+                console.log(`[IndexedDB Shared] ✅ ObjectStore '${EMERGENCIES_STORE_NAME}' creado con índices`)
+              } catch (error) {
+                console.error(`[IndexedDB Shared] ❌ Error al crear store '${EMERGENCIES_STORE_NAME}':`, error)
+                throw error
+              }
+            }
+          }
+
+          // Migración de versión 9 a 10: Asegurar que el store de emergencias existe
+          if (oldVersion < 10) {
+            console.log('[IndexedDB Shared] Migrando de versión 9 a 10: Verificando store de emergencias...')
+            const EMERGENCIES_STORE_NAME = 'emergencies'
+            if (!db.objectStoreNames.contains(EMERGENCIES_STORE_NAME)) {
+              try {
+                const emergenciesStore = db.createObjectStore(EMERGENCIES_STORE_NAME, { keyPath: 'emergencyId' })
+                emergenciesStore.createIndex('byAccount', 'reporterAccount', { unique: false })
+                emergenciesStore.createIndex('byStatus', 'status', { unique: false })
+                emergenciesStore.createIndex('byType', 'type', { unique: false })
+                emergenciesStore.createIndex('byRelatedLogId', 'relatedLogId', { unique: false })
+                emergenciesStore.createIndex('byCreatedAt', 'createdAt', { unique: false })
+                emergenciesStore.createIndex('byBlockchainTxHash', 'blockchainTxHash', { unique: false })
+                console.log(`[IndexedDB Shared] ✅ ObjectStore '${EMERGENCIES_STORE_NAME}' creado con índices en migración 9->10`)
+              } catch (error) {
+                console.error(`[IndexedDB Shared] ❌ Error al crear store '${EMERGENCIES_STORE_NAME}' en migración 9->10:`, error)
+                throw error
+              }
+            } else {
+              console.log(`[IndexedDB Shared] ✅ ObjectStore '${EMERGENCIES_STORE_NAME}' ya existe`)
             }
           }
         }

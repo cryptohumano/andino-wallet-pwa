@@ -27,15 +27,18 @@ import './index.css'
 import { router } from './router'
 import { KeyringProvider } from './contexts/KeyringContext'
 import { NetworkProvider } from './contexts/NetworkContext'
+import { ActiveAccountProvider } from './contexts/ActiveAccountContext'
 import { Toaster } from '@/components/ui/sonner'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <KeyringProvider>
-      <NetworkProvider>
-        <RouterProvider router={router} />
-        <Toaster />
-      </NetworkProvider>
+      <ActiveAccountProvider>
+        <NetworkProvider>
+          <RouterProvider router={router} />
+          <Toaster />
+        </NetworkProvider>
+      </ActiveAccountProvider>
     </KeyringProvider>
   </StrictMode>,
 )
