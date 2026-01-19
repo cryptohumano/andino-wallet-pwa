@@ -1,41 +1,73 @@
-# Aura Wallet
+# Andino Wallet
 
-Una Progressive Web App (PWA) moderna y segura para gestionar cuentas criptográficas en redes basadas en Substrate/Polkadot, con capacidades avanzadas de seguridad, privacidad y gestión de identidad.
+Una Progressive Web App (PWA) especializada para montañistas, diseñada para gestionar cuentas blockchain, bitácoras de montañismo, emergencias y documentación de expediciones en redes Polkadot/Substrate.
+
+## 🏔️ Para Montañistas
+
+Andino Wallet es tu compañero digital en la montaña. Gestiona tus expediciones, registra tus aventuras, mantén tus documentos seguros y activa emergencias cuando las necesites, todo desde tu dispositivo móvil, incluso sin conexión.
 
 ## 🚀 Características Principales
 
-### 🔐 Seguridad y Autenticación
-- **WebAuthn** - Autenticación biométrica y con hardware keys (Windows Hello, Touch ID, YubiKey)
-- **Encriptación AES-GCM-256** - Protección de claves privadas con contraseña
-- **Keyring no custodial** - Tus claves privadas nunca salen de tu dispositivo
-- **Firma digital** - Soporte para sr25519, ed25519 y ecdsa
+### 🗻 Bitácoras de Montañismo
+- **Registro de expediciones** - Crea bitácoras detalladas de tus aventuras
+- **Avisos de salida** - Registra información de tu grupo, ruta y contactos de emergencia
+- **Milestones GPS** - Marca puntos importantes con coordenadas precisas
+- **Tracking GPS** - Registra tu ruta en tiempo real
+- **Mapas offline** - Visualiza tus rutas sin necesidad de conexión
+- **Fotos y notas** - Documenta tu expedición con imágenes y anotaciones
 
-### 💼 Gestión de Cuentas
-- **Múltiples cuentas** - Gestiona múltiples cuentas desde un solo wallet
-- **Importación flexible** - Importa cuentas desde mnemonic, URI o archivos JSON
-- **Backup completo** - Exporta e importa todos tus datos (cuentas, contactos, configuraciones)
-- **Identicons** - Visualización de cuentas con Polkadot Identicons
+### 🚨 Sistema de Emergencias
+- **Botón de emergencia** - Activa una emergencia con un solo toque
+- **Registro en blockchain** - Las emergencias se registran de forma inmutable en Polkadot
+- **Datos de ubicación** - Comparte automáticamente tu posición GPS
+- **Contexto completo** - Incluye información de tu bitácora activa
+- **Escucha en tiempo real** - Recibe notificaciones de emergencias de tu cuenta
+- **Funciona offline** - Guarda emergencias localmente y sincroniza cuando hay conexión
 
-### 🌐 Multi-Cadena
-- **Soporte multi-cadena** - Conecta a múltiples redes Substrate simultáneamente
-- **Redes preconfiguradas** - Polkadot, Kusama, Paseo y sus parachains
-- **Balance multi-cadena** - Consulta balances en todas tus cuentas conectadas
-- **People Chain Integration** - Consulta identidades on-chain desde People Chain
+### 📄 Documentos y Credenciales
+- **Almacenamiento seguro** - Guarda documentos importantes (permisos, seguros, certificados)
+- **Firmas digitales** - Firma documentos con tu identidad blockchain
+- **Firmas autográficas** - Captura firmas manuscritas directamente en la app
+- **Exportación PDF** - Genera documentos PDF con toda la información
+- **Acceso offline** - Consulta tus documentos sin conexión
+
+### 🔐 Seguridad Blockchain
+- **Wallet no custodial** - Tus claves privadas nunca salen de tu dispositivo
+- **WebAuthn** - Autenticación biométrica (huella, Face ID, hardware keys)
+- **Encriptación AES-256** - Protección de datos con contraseña
+- **Multi-cadena** - Soporte para Polkadot, Kusama, Paseo y sus parachains
+- **People Chain** - Gestiona tu identidad on-chain
 
 ### 📱 Experiencia de Usuario
-- **Mobile-first** - Diseño optimizado para dispositivos móviles
-- **Offline-first** - Funciona completamente sin conexión
+- **Mobile-first** - Diseñado para usar en la montaña con una sola mano
+- **Offline-first** - Funciona completamente sin conexión a internet
 - **Instalable** - Instala como app nativa en tu dispositivo
-- **UI intuitiva** - Menos de 3 clicks para cualquier acción
+- **UI intuitiva** - Interfaz simple y clara, incluso con guantes
+- **Modo oscuro** - Protege tus ojos en condiciones de poca luz
 
-### 🔒 Privacidad e Identidad
-- **Página de Identidad** - Gestiona tu identidad on-chain y privacidad
-- **Contactos** - Guarda direcciones de contactos frecuentes
-- **Configuración de APIs** - Conecta con servicios externos de atestación
+## 🎯 Casos de Uso
+
+### Antes de la Expedición
+1. **Crear bitácora** - Registra los detalles de tu próxima aventura
+2. **Aviso de salida** - Completa información del grupo, ruta y contactos
+3. **Subir documentos** - Guarda permisos, seguros y certificaciones
+4. **Preparar mapas** - Descarga mapas offline de tu ruta
+
+### Durante la Expedición
+1. **Tracking GPS** - Registra tu ruta en tiempo real
+2. **Agregar milestones** - Marca puntos importantes (campamentos, cumbres, cruces)
+3. **Tomar fotos** - Documenta tu aventura con imágenes geolocalizadas
+4. **Activar emergencia** - Si es necesario, activa una emergencia con un toque
+
+### Después de la Expedición
+1. **Revisar bitácora** - Consulta todos los detalles de tu expedición
+2. **Exportar documentos** - Genera PDFs con toda la información
+3. **Compartir** - Comparte tu aventura con otros montañistas
+4. **Archivar** - Guarda tus bitácoras para futuras referencias
 
 ## 📦 Instalación
 
-Este proyecto usa **Yarn** como gestor de paquetes. Asegúrate de tener Yarn instalado:
+Este proyecto usa **Yarn** como gestor de paquetes:
 
 ```bash
 # Instalar Yarn globalmente (si no lo tienes)
@@ -66,76 +98,53 @@ yarn build
 yarn preview
 ```
 
-## 🌐 Redes Soportadas
+## 🌐 Redes Blockchain Soportadas
 
 ### Redes Principales
-- **Polkadot** (wss://rpc.polkadot.io)
-- **Kusama** (wss://kusama-rpc.polkadot.io)
-- **Paseo Relay Chain** (wss://rpc.ibp.network/paseo) - Testnet de Polkadot
+- **Polkadot** - Red principal de Polkadot
+- **Kusama** - Canary network de Polkadot
+- **Paseo** - Testnet de Polkadot
 
-### Parachains de Polkadot
-- Asset Hub (Polkadot) (wss://polkadot-asset-hub-rpc.polkadot.io)
-- People Chain (Polkadot) (wss://polkadot-people-rpc.polkadot.io)
+### Parachains
+- **Asset Hub** - Gestión de assets
+- **People Chain** - Identidad on-chain
+- **Bridge Hub** - Puentes cross-chain
 
-### Parachains de Kusama
-- Asset Hub (Kusama) (wss://kusama-asset-hub-rpc.polkadot.io)
-- People Chain (Kusama) (wss://kusama-people-rpc.polkadot.io)
-
-### Parachains de Paseo
-- Asset Hub (Paseo) (wss://sys.ibp.network/asset-hub-paseo)
-- Bridge Hub (Paseo) (wss://sys.ibp.network/bridgehub-paseo)
-- Coretime (Paseo) (wss://sys.ibp.network/coretime-paseo)
-- People (Paseo) (wss://sys.ibp.network/people-paseo)
-- Collectives (Paseo) (wss://collectives-paseo.dotters.network)
-
-## 🎯 Funcionalidades
+## 🔑 Funcionalidades Técnicas
 
 ### Gestión de Cuentas
-- Crear nuevas cuentas con mnemonic de 12 o 24 palabras
-- Importar cuentas desde mnemonic, URI o archivo JSON
-- Gestionar múltiples cuentas simultáneamente
-- Ver balances en múltiples cadenas
-- Enviar transacciones
+- Crear y gestionar múltiples cuentas blockchain
+- Importar cuentas desde mnemonic o archivos JSON
+- Backup completo y seguro de todas tus cuentas
+- Soporte para sr25519, ed25519 y ecdsa
+
+### Transacciones
+- Enviar y recibir tokens
+- Ver historial de transacciones
+- Estimar fees antes de enviar
+- QR codes para recibir pagos
 
 ### Seguridad
-- **WebAuthn** - Autenticación con PIN, huella dactilar o hardware key
-- **Encriptación** - Todas las cuentas se almacenan encriptadas localmente
+- **WebAuthn** - Autenticación con PIN, huella o hardware key
+- **Encriptación local** - Todos los datos se almacenan encriptados
 - **Backup seguro** - Exporta tus datos encriptados con contraseña
 - **Recuperación** - Restaura tu wallet desde un backup
 
-### Privacidad
-- **Identidad On-Chain** - Consulta y gestiona tu identidad en People Chain
-- **Contactos** - Guarda direcciones de contactos frecuentes
-- **Configuración de APIs** - Conecta con servicios externos de forma segura
-
-### Transacciones
-- Enviar tokens a otras direcciones
-- Recibir tokens (mostrar QR code)
-- Ver historial de transacciones
-- Estimar fees antes de enviar
-
-## 🔑 Tipos de Criptografía Soportados
-
-- **sr25519** (Schnorrkel) - Recomendado para Substrate
-- **ed25519** (Edwards) - Alternativa común
-- **ecdsa** - Compatible con Ethereum (usado en Moonbeam)
-
 ## 📚 Documentación
 
-La documentación completa del proyecto está disponible en la carpeta `docs/`:
+La documentación completa está disponible en la carpeta `docs/`:
 
-- **[API Design](./docs/API_DESIGN.md)** - Diseño de la API para servicios externos
-- **[Database Structure](./docs/AURA_WALLET_DATABASE.md)** - Estructura de IndexedDB
-- **[UI Structure](./docs/AURA_WALLET_UI_STRUCTURE.md)** - Estructura de páginas y componentes
-- **[WebAuthn Implementation](./docs/WEBAUTHN_IMPLEMENTATION.md)** - Implementación de WebAuthn
-- **[Keyring Flow](./docs/KEYRING_FLOW.md)** - Flujo de gestión del keyring
-- **[PWA Offline Capabilities](./docs/PWA_OFFLINE_CAPABILITIES.md)** - Capacidades offline
+- **[Plan PWA Emergencias](./docs/PLAN_PWA_EMERGENCIAS_MINIMA.md)** - Plan para versión mínima de emergencias
+- **[GPS Tracking](./docs/GPS_TRACKING.md)** - Sistema de tracking GPS
+- **[Base de Datos](./docs/AURA_WALLET_DATABASE.md)** - Estructura de IndexedDB
+- **[WebAuthn](./docs/WEBAUTHN_IMPLEMENTATION.md)** - Implementación de WebAuthn
+- **[Capacidades Offline](./docs/PWA_OFFLINE_CAPABILITIES.md)** - Funcionamiento offline
 
 ## 🛡️ Seguridad
 
 ### ⚠️ Advertencia Importante
 
-Aura Wallet es una aplicación **no custodial**. Esto significa:
+Andino Wallet es una aplicación **no custodial**. Esto significa:
 
 - **Tú eres el único responsable** de tus claves privadas y fondos
 - **Guarda tu frase de recuperación** en un lugar seguro
@@ -147,7 +156,7 @@ Aura Wallet es una aplicación **no custodial**. Esto significa:
 
 1. **Backup regular** - Exporta tu wallet regularmente
 2. **Contraseña segura** - Usa una contraseña fuerte y única
-3. **WebAuthn** - Configura WebAuthn para autenticación adicional
+3. **WebAuthn** - Configura autenticación biométrica
 4. **Verifica direcciones** - Siempre verifica las direcciones antes de enviar
 5. **Mantén actualizado** - Mantén la aplicación actualizada
 
@@ -157,12 +166,23 @@ Aura Wallet es una aplicación **no custodial**. Esto significa:
 - **React 18** - Framework UI
 - **TypeScript** - Tipado estático completo
 - **Tailwind CSS 4** - Framework CSS moderno
-- **shadcn/ui** - Componentes UI accesibles y personalizables
-- **Dedot** - Cliente JavaScript de próxima generación para Polkadot
+- **shadcn/ui** - Componentes UI accesibles
+- **Dedot** - Cliente JavaScript para Polkadot
 - **Polkadot.js Keyring** - Gestión de cuentas criptográficas
 - **IndexedDB** - Almacenamiento local encriptado
-- **WebAuthn API** - Autenticación biométrica y con hardware keys
+- **Leaflet** - Mapas interactivos
+- **WebAuthn API** - Autenticación biométrica
 - **Workbox** - Service Worker para capacidades offline
+
+## 🎯 Roadmap
+
+### Próximas Características
+- [ ] Integración con servicios de emergencia externos
+- [ ] Compartir bitácoras con otros montañistas
+- [ ] Estadísticas de expediciones
+- [ ] Integración con dispositivos GPS externos
+- [ ] Notificaciones push para emergencias
+- [ ] Modo avión mejorado
 
 ## 📝 Licencia
 
@@ -175,3 +195,7 @@ Las contribuciones son bienvenidas. Por favor, abre un issue o pull request para
 ## 📧 Contacto
 
 Para preguntas o soporte, por favor abre un issue en el repositorio.
+
+---
+
+**Andino Wallet** - Tu compañero digital en la montaña 🏔️
