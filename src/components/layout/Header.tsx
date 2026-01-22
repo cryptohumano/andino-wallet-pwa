@@ -42,7 +42,9 @@ export function Header() {
   const context = useContext(NetworkContext)
   const [logoError, setLogoError] = useState(false)
   // Usar BASE_URL de Vite para rutas correctas en producción (GitHub Pages)
-  const logoPath = '/web-app-manifest-192x192.png'
+  // En desarrollo será '/', en producción será '/andino-wallet-pwa/'
+  const baseUrl = import.meta.env.BASE_URL || '/'
+  const logoPath = `${baseUrl}web-app-manifest-192x192.png`
   
   // Si el contexto no está disponible, renderizar un header simplificado
   if (!context) {

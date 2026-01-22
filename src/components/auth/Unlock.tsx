@@ -66,7 +66,7 @@ export function Unlock() {
           <div className="mx-auto mb-6 flex flex-col items-center">
             <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#0477BF] via-[#05C7F2] to-[#F21667] flex items-center justify-center shadow-lg mb-3 ring-2 ring-[#F2E205]/30">
               <img 
-                src="/web-app-manifest-192x192.png" 
+                src={`${import.meta.env.BASE_URL || '/'}web-app-manifest-192x192.png`} 
                 alt="Andino Wallet" 
                 className="w-20 h-20 rounded-xl"
                 onError={(e) => {

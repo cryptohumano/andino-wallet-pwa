@@ -106,7 +106,7 @@ export default function Onboarding() {
             <div className="mx-auto mb-6 flex flex-col items-center">
               <div className="w-32 h-32 rounded-3xl bg-gradient-to-br from-[#0477BF] via-[#05C7F2] to-[#F21667] flex items-center justify-center shadow-2xl mb-4 ring-4 ring-[#F2E205]/40 dark:ring-[#F2E205]/20">
                 <img 
-                  src="/web-app-manifest-192x192.png" 
+                  src={`${import.meta.env.BASE_URL || '/'}web-app-manifest-192x192.png`} 
                   alt="Andino Wallet" 
                   className="w-28 h-28 rounded-2xl"
                   onError={(e) => {

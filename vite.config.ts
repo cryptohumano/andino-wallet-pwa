@@ -200,19 +200,19 @@ export default defineConfig({
         dir: 'ltr',
         icons: [
           {
-            src: 'web-app-manifest-192x192.png',
+            src: `${basePath}web-app-manifest-192x192.png`,
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'web-app-manifest-512x512.png',
+            src: `${basePath}web-app-manifest-512x512.png`,
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'web-app-manifest-512x512.png',
+            src: `${basePath}web-app-manifest-512x512.png`,
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
@@ -225,28 +225,28 @@ export default defineConfig({
             short_name: 'Inicio',
             description: 'Ver resumen de cuentas y balances',
             url: basePath,
-            icons: [{ src: 'web-app-manifest-192x192.png', sizes: '192x192' }]
+            icons: [{ src: `${basePath}web-app-manifest-192x192.png`, sizes: '192x192' }]
           },
           {
             name: 'Enviar',
             short_name: 'Enviar',
             description: 'Enviar tokens a otra dirección',
             url: basePath + 'send',
-            icons: [{ src: 'web-app-manifest-192x192.png', sizes: '192x192' }]
+            icons: [{ src: `${basePath}web-app-manifest-192x192.png`, sizes: '192x192' }]
           },
           {
             name: 'Cuentas',
             short_name: 'Cuentas',
             description: 'Gestionar cuentas del wallet',
             url: basePath + 'accounts',
-            icons: [{ src: 'web-app-manifest-192x192.png', sizes: '192x192' }]
+            icons: [{ src: `${basePath}web-app-manifest-192x192.png`, sizes: '192x192' }]
           },
           {
             name: 'Identidad',
             short_name: 'Identidad',
             description: 'Gestionar identidad y privacidad',
             url: basePath + 'identity',
-            icons: [{ src: 'web-app-manifest-192x192.png', sizes: '192x192' }]
+            icons: [{ src: `${basePath}web-app-manifest-192x192.png`, sizes: '192x192' }]
           }
         ]
       },
