@@ -87,27 +87,33 @@ if (process.env.NODE_ENV === 'production' && (!basePath || basePath === '/')) {
 
 // Plugin para transformar rutas en index.html durante el build
 // IMPORTANTE: Vite transforma automáticamente los scripts cuando base está configurado
-// Este plugin solo ajusta rutas de assets estáticos que Vite no transforma automáticamente
+// Este plugin ajusta rutas estáticas que Vite no transforma automáticamente
 const transformHtmlPlugin = () => {
   return {
     name: 'transform-html',
-    enforce: 'post' as const, // Ejecutar después de otros plugins
+    enforce: 'post' as const, // Ejecutar después de otros plugins (incluyendo VitePWA)
     transformIndexHtml(html: string) {
-      // En producción con base path, ajustar rutas de assets estáticos
+      // Solo transformar en producción con base path
       if (process.env.NODE_ENV === 'production' && basePath !== '/') {
         let transformed = html
         
         // Reemplazar rutas absolutas de favicons y otros assets estáticos
-        // Vite transforma automáticamente los scripts cuando base está configurado
+        // Estos no son transformados automáticamente por Vite
         transformed = transformed
           .replace(/href="\/(favicon|apple-touch-icon)/g, `href="${basePath}$1`)
         
+        // Vite transforma automáticamente /src/main.tsx a /assets/index-xxxxx.js
+        // y también transforma el src del script. No necesitamos transformar /src/ manualmente
+        // porque Vite ya lo hace. Solo necesitamos asegurar que /assets/ tenga el base path.
+        
         // Asegurar que todas las rutas de assets compilados tengan el base path
-        // Vite debería hacer esto automáticamente, pero por si acaso verificamos:
-        if (basePath !== '/') {
-          // Reemplazar rutas de scripts y estilos que empiecen con /assets/ pero no tengan el base path
+        // Vite debería transformar automáticamente /src/main.tsx a /assets/index-xxxxx.js
+        // y también debería agregar el base path. Si no lo hace, lo agregamos manualmente.
+        // Transformar rutas que empiecen con /assets/ y no tengan ya el base path
+        if (!transformed.includes(`${basePath}assets/`)) {
+          // Si no hay ninguna ruta con el base path, transformar todas las rutas /assets/
           transformed = transformed.replace(
-            /(src|href)="\/assets\//g, 
+            /(src|href)="\/assets\//g,
             `$1="${basePath}assets/`
           )
         }
