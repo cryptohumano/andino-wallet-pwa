@@ -85,6 +85,40 @@ if (process.env.NODE_ENV === 'production' && (!basePath || basePath === '/')) {
   console.warn('[Vite Config] Usando fallback: /andino-wallet-pwa/')
 }
 
+// Plugin para transformar rutas en index.html durante el build
+// IMPORTANTE: Vite transforma automáticamente los scripts cuando base está configurado
+// Este plugin solo ajusta rutas de assets estáticos que Vite no transforma automáticamente
+const transformHtmlPlugin = () => {
+  return {
+    name: 'transform-html',
+    enforce: 'post' as const, // Ejecutar después de otros plugins
+    transformIndexHtml(html: string) {
+      // En producción con base path, ajustar rutas de assets estáticos
+      if (process.env.NODE_ENV === 'production' && basePath !== '/') {
+        let transformed = html
+        
+        // Reemplazar rutas absolutas de favicons y otros assets estáticos
+        // Vite transforma automáticamente los scripts cuando base está configurado
+        transformed = transformed
+          .replace(/href="\/(favicon|apple-touch-icon)/g, `href="${basePath}$1`)
+        
+        // Asegurar que todas las rutas de assets compilados tengan el base path
+        // Vite debería hacer esto automáticamente, pero por si acaso verificamos:
+        if (basePath !== '/') {
+          // Reemplazar rutas de scripts y estilos que empiecen con /assets/ pero no tengan el base path
+          transformed = transformed.replace(
+            /(src|href)="\/assets\//g, 
+            `$1="${basePath}assets/`
+          )
+        }
+        
+        return transformed
+      }
+      return html
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   base: basePath,
@@ -98,9 +132,17 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    transformHtmlPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      includeAssets: [
+        'favicon.ico', 
+        'favicon.svg', 
+        'favicon-96x96.png',
+        'apple-touch-icon.png',
+        'web-app-manifest-192x192.png',
+        'web-app-manifest-512x512.png'
+      ],
       base: getBase(),
       scope: getBase(),
       strategies: 'generateSW',
