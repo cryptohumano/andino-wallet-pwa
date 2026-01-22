@@ -66,6 +66,7 @@ import { createDocumentFromPDF } from '@/services/documents/DocumentService'
 import { signDocumentWithSubstrate } from '@/services/signatures/SubstrateSigner'
 import { useKeyringContext } from '@/contexts/KeyringContext'
 import { useActiveAccount } from '@/contexts/ActiveAccountContext'
+import { useIsMobile } from '@/hooks/use-mobile'
 import {
   Select,
   SelectContent,
@@ -78,21 +79,11 @@ export default function MountainLogDetail() {
   const { logId } = useParams<{ logId: string }>()
   const navigate = useNavigate()
   const cameraInputRef = useRef<HTMLInputElement>(null)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useIsMobile()
   const [showCameraDialog, setShowCameraDialog] = useState(false)
   const [currentMilestoneForImage, setCurrentMilestoneForImage] = useState<string | null>(null)
   // Estado para mantener milestoneId durante el proceso de captura (iOS puede perder el atributo)
   const milestoneIdForCapture = useRef<string | null>(null)
-
-  // Detectar si es dispositivo móvil
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768)
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
   const [showAddMilestone, setShowAddMilestone] = useState(false)
 
   const [log, setLog] = useState<MountainLog | null>(null)
@@ -2049,7 +2040,23 @@ export default function MountainLogDetail() {
       )}
 
       {/* FAB de Emergencia - Solo en móvil cuando hay bitácora activa con milestone */}
-      {isMobile && log && log.status !== 'completed' && log.status !== 'draft' && log.milestones && log.milestones.length > 0 && (
+      {(() => {
+        const shouldShowFAB = isMobile && log && log.status !== 'completed' && log.status !== 'draft' && log.milestones && log.milestones.length > 0
+        if (isMobile && log) {
+          console.log('[MountainLogDetail] Condiciones FAB de emergencia:', {
+            isMobile,
+            hasLog: !!log,
+            logStatus: log.status,
+            hasMilestones: !!(log.milestones && log.milestones.length > 0),
+            milestonesCount: log.milestones?.length || 0,
+            shouldShowFAB,
+            isStandalone: window.matchMedia('(display-mode: standalone)').matches,
+            userAgent: navigator.userAgent,
+            windowWidth: window.innerWidth,
+          })
+        }
+        return shouldShowFAB
+      })() && (
         <>
           <FAB
             icon={AlertTriangle}

@@ -238,14 +238,20 @@ export function RouteMap({ log, className }: RouteMapProps) {
   // Generar mapa offline (SVG)
   useEffect(() => {
     if (useOfflineMap && svgContainerRef.current && points.length > 0) {
-      const { generateOfflineRouteMap } = require('@/utils/offlineMapGenerator')
-      const svg = generateOfflineRouteMap(points, {
-        width: svgContainerRef.current.clientWidth || 800,
-        height: 384,
-        showMarkers: true,
-        showLabels: true,
+      // Usar import dinámico en lugar de require (compatible con navegador)
+      import('@/utils/offlineMapGenerator').then(({ generateOfflineRouteMap }) => {
+        const svg = generateOfflineRouteMap(points, {
+          width: svgContainerRef.current?.clientWidth || 800,
+          height: 384,
+          showMarkers: true,
+          showLabels: true,
+        })
+        if (svgContainerRef.current) {
+          svgContainerRef.current.innerHTML = svg
+        }
+      }).catch((error) => {
+        console.error('[RouteMap] Error al cargar generador de mapa offline:', error)
       })
-      svgContainerRef.current.innerHTML = svg
     }
   }, [useOfflineMap, points])
   

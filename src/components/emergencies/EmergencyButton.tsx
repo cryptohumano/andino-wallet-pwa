@@ -88,25 +88,35 @@ export function EmergencyButton({
         }
         
         // Si aún no hay ubicación, intentar directamente con geolocation
+        // Usar timeout más corto y menos precisión para evitar esperas largas
         if (!location) {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('Timeout')), 10000)
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                clearTimeout(timeout)
-                resolve(pos)
-              },
-              reject,
-              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            )
-          })
+          try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              const timeout = setTimeout(() => reject(new Error('Timeout')), 5000) // Reducido a 5 segundos
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  clearTimeout(timeout)
+                  resolve(pos)
+                },
+                reject,
+                { 
+                  enableHighAccuracy: false, // Menos precisión pero más rápido
+                  timeout: 5000, // 5 segundos
+                  maximumAge: 60000 // Aceptar ubicación de hasta 1 minuto
+                }
+              )
+            })
 
-          location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            altitude: position.coords.altitude || undefined,
-            accuracy: position.coords.accuracy,
-            timestamp: Date.now(),
+            location = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              altitude: position.coords.altitude || undefined,
+              accuracy: position.coords.accuracy,
+              timestamp: Date.now(),
+            }
+          } catch (gpsError) {
+            console.warn('[EmergencyButton] Error al obtener GPS directamente:', gpsError)
+            // Continuar con el fallback a ubicación de la bitácora
           }
         }
       } catch (error) {
