@@ -22,6 +22,23 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 /**
+ * Formatea la duración en segundos a formato legible (h m)
+ * Maneja tanto segundos como milisegundos para compatibilidad
+ */
+export function formatDuration(duration: number): string {
+  // Si la duración es muy grande (> 1 año en segundos), probablemente está en milisegundos
+  const durationInSeconds = duration > 31536000 ? duration / 1000 : duration
+  
+  const hours = Math.floor(durationInSeconds / 3600)
+  const minutes = Math.floor((durationInSeconds % 3600) / 60)
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  }
+  return `${minutes}m`
+}
+
+/**
  * Calcula estadísticas completas de una bitácora de montañismo
  */
 export function calculateMountainLogStatistics(log: MountainLog): MountainLog['statistics'] {

@@ -19,8 +19,10 @@ import MedicalRecords from '@/pages/MedicalRecords'
 import Attestations from '@/pages/Attestations'
 import MountainLogs from '@/pages/MountainLogs'
 import MountainLogDetail from '@/pages/MountainLogDetail'
+import Emergencies from '@/pages/Emergencies'
 import Settings from '@/pages/Settings'
 import Identity from '@/pages/Identity'
+import SeedMountainLogs from '@/pages/SeedMountainLogs'
 
 // Obtener el base path desde import.meta.env.BASE_URL (configurado por Vite)
 // En desarrollo será '/', en producción será '/aura-pwa/' para GitHub Pages
@@ -136,12 +138,20 @@ export const router = createBrowserRouter([
         ],
       },
       {
+        path: 'emergencies',
+        element: <Emergencies />,
+      },
+      {
         path: 'settings',
         element: <Settings />,
       },
       {
         path: 'identity',
         element: <Identity />,
+      },
+      {
+        path: 'seed-mountain-logs',
+        element: <SeedMountainLogs />,
       },
     ],
   },

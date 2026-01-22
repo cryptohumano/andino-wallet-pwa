@@ -177,14 +177,14 @@ export function AvisoSalidaForm({ log, onUpdate, onComplete }: AvisoSalidaFormPr
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 bg-background min-h-screen">
       {/* Resumen de datos dummy si se cargaron */}
       {showDummySummary && log.avisoSalida && (
         <DummyDataSummary avisoSalida={log.avisoSalida} />
       )}
       
       {/* Header con progreso */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b pb-4">
+      <div className="sticky top-0 z-10 bg-background border-b pb-4">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 overflow-x-auto pb-2 flex-1">
             {sections.map((section) => (
@@ -994,7 +994,7 @@ export function AvisoSalidaForm({ log, onUpdate, onComplete }: AvisoSalidaFormPr
       )}
 
       {/* Navegación entre secciones */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 space-y-2 z-10 safe-area-bottom">
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 space-y-2 z-10 safe-area-bottom aviso-salida-footer">
         <div className="flex gap-2">
           {currentSection > 1 && (
             <Button

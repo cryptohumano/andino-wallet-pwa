@@ -38,6 +38,7 @@ import { toast } from 'sonner'
 import { v4 as uuidv4 } from 'uuid'
 import type { MountainLogStatus, MountainLogMilestone, MountainLogImage, GPSPoint, GPSMetadata } from '@/types/mountainLogs'
 import { validateGPSPoint } from '@/utils/gpsValidation'
+import { formatDuration } from '@/utils/mountainLogStatistics'
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,8 @@ import PhotoCapture from '@/components/documents/PhotoCapture'
 import { generateMountainLogPDF } from '@/services/mountainLogs/mountainLogPDFGenerator'
 import { EmergencyButton } from '@/components/emergencies/EmergencyButton'
 import { EmergencyPanel } from '@/components/emergencies/EmergencyPanel'
+import { FAB } from '@/components/ui/fab'
+import { AlertTriangle } from 'lucide-react'
 import { downloadPDF } from '@/utils/pdfUtils'
 import SignatureSelector from '@/components/signatures/SignatureSelector'
 import type { Document } from '@/types/documents'
@@ -100,6 +103,7 @@ export default function MountainLogDetail() {
   const [selectedMilestoneDescription, setSelectedMilestoneDescription] = useState<{ title: string; description: string } | null>(null)
   const [showSignDialog, setShowSignDialog] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
+  const [showEmergencyDialog, setShowEmergencyDialog] = useState(false)
   const [document, setDocument] = useState<Document | null>(null)
   const { accounts, getAccount } = useKeyringContext()
 
@@ -1135,7 +1139,7 @@ export default function MountainLogDetail() {
   if (showPlaneacion && !logId) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
+        <div className="sticky top-0 z-10 bg-background border-b">
           <div className="flex items-center justify-between p-4">
             <Button
               variant="ghost"
@@ -1187,7 +1191,7 @@ export default function MountainLogDetail() {
   if (showAvisoSalida && !logId) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b">
+        <div className="sticky top-0 z-10 bg-background border-b">
           <div className="flex items-center justify-between p-4">
             <Button
               variant="ghost"
@@ -1246,7 +1250,7 @@ export default function MountainLogDetail() {
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header fijo */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+      <div className="sticky top-0 z-10 bg-background border-b">
         <div className="flex items-center justify-between p-4">
           <Button
             variant="ghost"
@@ -1390,23 +1394,28 @@ export default function MountainLogDetail() {
 
         {/* Botón de Emergencia - Siempre visible cuando hay bitácora activa */}
         {!isReadOnly && (
-          <Card className="border-destructive/50 bg-destructive/5">
+          <Card className="border-destructive/50 bg-destructive/5" data-emergency-section>
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1">
                   <h3 className="font-semibold text-destructive mb-1">¿Necesitas ayuda de emergencia?</h3>
                   <p className="text-sm text-muted-foreground">
-                    Si estás en una situación de emergencia, presiona el botón para enviar una alerta a la blockchain.
+                    {isMobile 
+                      ? 'Usa el botón flotante (FAB) a la izquierda para crear una emergencia rápidamente.'
+                      : 'Si estás en una situación de emergencia, presiona el botón para enviar una alerta a la blockchain.'
+                    }
                   </p>
                 </div>
-                <EmergencyButton 
-                  log={log}
-                  currentLocation={currentLocation}
-                  onEmergencyCreated={(emergencyId) => {
-                    console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
-                    toast.info('Emergencia activa. Revisa el estado en el panel de emergencias.')
-                  }}
-                />
+                {!isMobile && (
+                  <EmergencyButton 
+                    log={log}
+                    currentLocation={currentLocation}
+                    onEmergencyCreated={(emergencyId) => {
+                      console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
+                      toast.info('Emergencia activa. Revisa el estado en el panel de emergencias.')
+                    }}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1438,7 +1447,7 @@ export default function MountainLogDetail() {
                   <div>
                     <p className="text-xs text-muted-foreground">Duración Total</p>
                     <p className="text-lg font-semibold">
-                      {Math.floor(log.statistics.totalDuration / 3600)}h {Math.floor((log.statistics.totalDuration % 3600) / 60)}m
+                      {formatDuration(log.statistics.totalDuration)}
                     </p>
                   </div>
                 )}
@@ -1993,6 +2002,42 @@ export default function MountainLogDetail() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* FAB de Emergencia - Solo en móvil cuando hay bitácora activa con milestone */}
+      {isMobile && log && log.status === 'active' && log.milestones && log.milestones.length > 0 && (
+        <>
+          <FAB
+            icon={AlertTriangle}
+            label="Crear Emergencia"
+            onClick={() => setShowEmergencyDialog(true)}
+            variant="destructive"
+            position="left"
+            aria-label="Crear Emergencia"
+          />
+          {/* Diálogo de emergencia para móvil */}
+          <Dialog open={showEmergencyDialog} onOpenChange={setShowEmergencyDialog}>
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Crear Emergencia</DialogTitle>
+                <DialogDescription>
+                  Reporta una emergencia que será registrada en la blockchain
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <EmergencyButton 
+                  log={log}
+                  currentLocation={currentLocation}
+                  onEmergencyCreated={(emergencyId) => {
+                    console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
+                    toast.info('Emergencia activa. Revisa el estado en el panel de emergencias.')
+                    setShowEmergencyDialog(false)
+                  }}
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
     </div>
   )

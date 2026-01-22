@@ -395,7 +395,11 @@ export function RouteMap({ log, className }: RouteMapProps) {
             <div 
               ref={mapContainerRef}
               className="h-96 w-full rounded-lg border overflow-hidden"
-              style={{ minHeight: '384px' }}
+              style={{ 
+                minHeight: '384px',
+                position: 'relative',
+                zIndex: 0,
+              }}
             />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>

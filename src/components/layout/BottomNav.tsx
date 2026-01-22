@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
-import { Home, Wallet, Send, FileText, Settings, Menu, X, Mountain } from 'lucide-react'
+import { Home, Wallet, Send, FileText, Settings, Menu, X, Mountain, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -12,13 +12,16 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { ActiveAccountSwitcher } from '@/components/ActiveAccountSwitcher'
+import { BalanceDisplay } from '@/components/BalanceDisplay'
+import { ThemeToggle } from '@/components/ThemeToggle'
 
 const navigation = [
-  { name: 'Inicio', href: '/', icon: Home, description: 'Ver resumen de cuentas y balances' },
+  { name: 'Inicio', href: '/', icon: Home, description: 'Bitácoras activas y emergencias' },
+  { name: 'Bitácoras', href: '/mountain-logs', icon: Mountain, description: 'Registrar expediciones de montañismo' },
+  { name: 'Emergencias', href: '/emergencies', icon: AlertTriangle, description: 'Ver y gestionar emergencias' },
+  { name: 'Documentos', href: '/documents', icon: FileText, description: 'Gestionar documentos' },
   { name: 'Cuentas', href: '/accounts', icon: Wallet, description: 'Gestionar tus cuentas' },
   { name: 'Enviar', href: '/send', icon: Send, description: 'Enviar tokens' },
-  { name: 'Documentos', href: '/documents', icon: FileText, description: 'Gestionar documentos' },
-  { name: 'Bitácoras de Montañismo', href: '/mountain-logs', icon: Mountain, description: 'Registrar expediciones de montañismo' },
   { name: 'Configuración', href: '/settings', icon: Settings, description: 'Ajustes y preferencias' },
 ]
 
@@ -46,7 +49,7 @@ export function BottomNav() {
           <SheetTrigger asChild>
             <Button
               size="lg"
-              className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 bg-primary text-primary-foreground hover:bg-primary/90"
+              className="h-14 w-14 rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 bg-primary text-primary-foreground hover:bg-primary/90 border-2 border-primary/40"
               aria-label="Abrir menú de navegación"
             >
               {isOpen ? (
@@ -57,9 +60,10 @@ export function BottomNav() {
             </Button>
           </SheetTrigger>
           <SheetContent 
-            side="bottom" 
-            className="h-[70vh] rounded-t-2xl overflow-y-auto"
+            side="bottom-above-fab" 
+            className="h-[70vh] rounded-t-2xl overflow-y-auto sheet-solid-bg"
             style={{
+              bottom: 'calc(max(1rem, env(safe-area-inset-bottom, 1rem)) + 5rem)',
               paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))',
             }}
           >
@@ -69,10 +73,19 @@ export function BottomNav() {
                 Selecciona una opción para navegar
               </SheetDescription>
             </SheetHeader>
+            {/* Balance Display - Solo en móvil */}
+            <div className="mt-4 mb-4 px-1">
+              <BalanceDisplay />
+            </div>
             {/* Selector de cuenta activa - Solo en móvil */}
             <div className="mt-4 mb-4">
               <div className="text-sm font-medium mb-2 px-1">Cuenta activa</div>
               <ActiveAccountSwitcher />
+            </div>
+            {/* Theme Toggle - Solo en móvil */}
+            <div className="mt-4 mb-4 px-1">
+              <div className="text-sm font-medium mb-2">Tema</div>
+              <ThemeToggle />
             </div>
             <div className="mt-6 space-y-2 pb-4">
               {navigation.map((item) => {
