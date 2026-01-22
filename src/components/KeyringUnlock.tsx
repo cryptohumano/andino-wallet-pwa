@@ -227,7 +227,13 @@ export function KeyringUnlock() {
         )}
 
         {/* Opción con contraseña */}
-        <div className="space-y-2">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleUnlock()
+          }}
+          className="space-y-2"
+        >
           <div className="text-sm font-medium text-muted-foreground">
             {webauthnCredentials.length > 0 ? 'Contraseña' : 'Desbloquear con Contraseña'}
           </div>
@@ -241,10 +247,12 @@ export function KeyringUnlock() {
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                e.preventDefault()
                 handleUnlock()
               }
             }}
             disabled={isLoading || isWebAuthnLoading}
+            autoComplete="current-password"
           />
           {error && (
             <div className="flex items-center gap-2 text-sm text-destructive">
@@ -253,13 +261,13 @@ export function KeyringUnlock() {
             </div>
           )}
           <Button 
-            onClick={handleUnlock} 
+            type="submit"
             disabled={isLoading || isWebAuthnLoading || !password.trim()} 
             className="w-full"
           >
             {isLoading ? 'Desbloqueando...' : 'Desbloquear con Contraseña'}
           </Button>
-        </div>
+        </form>
 
         <div className="p-3 bg-muted rounded-lg">
           <p className="text-xs text-muted-foreground">

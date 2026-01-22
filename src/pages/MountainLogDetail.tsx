@@ -1380,7 +1380,9 @@ export default function MountainLogDetail() {
           log={log}
           onEmergencyUpdate={() => {
             // Recargar si es necesario
-            console.log('[MountainLogDetail] Emergencia actualizada')
+            if (import.meta.env.DEV) {
+              console.log('[MountainLogDetail] Emergencia actualizada')
+            }
           }}
         />
 
@@ -1403,7 +1405,9 @@ export default function MountainLogDetail() {
                     log={log}
                     currentLocation={currentLocation}
                     onEmergencyCreated={(emergencyId) => {
-                      console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
+                      if (import.meta.env.DEV) {
+                        console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
+                      }
                       toast.info('Emergencia activa. Revisa el estado en el panel de emergencias.')
                     }}
                   />
@@ -2047,8 +2051,8 @@ export default function MountainLogDetail() {
         const hasMilestones = !!(log?.milestones && log.milestones.length > 0)
         const shouldShowFAB = isMobile && hasLog && isActiveLog && hasMilestones
         
-        // Logs de depuración (siempre, para ayudar a diagnosticar problemas)
-        if (hasLog) {
+        // Logs de depuración solo en desarrollo
+        if (hasLog && import.meta.env.DEV) {
           console.log('[MountainLogDetail] Condiciones FAB de emergencia:', {
             isMobile,
             hasLog,

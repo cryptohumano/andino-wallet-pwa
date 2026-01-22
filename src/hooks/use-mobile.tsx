@@ -44,8 +44,8 @@ export function useIsMobile() {
       const mobile = isSmallScreen || isMobileUserAgent || isStandalone
       setIsMobile(mobile)
       
-      // Log para depuración en desarrollo
-      if (process.env.NODE_ENV === 'development') {
+      // Log para depuración solo en desarrollo
+      if (import.meta.env.DEV) {
         console.log('[useIsMobile] Estado actualizado:', {
           isSmallScreen,
           isMobileUserAgent,
