@@ -2041,20 +2041,32 @@ export default function MountainLogDetail() {
 
       {/* FAB de Emergencia - Solo en móvil cuando hay bitácora activa con milestone */}
       {(() => {
-        const shouldShowFAB = isMobile && log && log.status !== 'completed' && log.status !== 'draft' && log.milestones && log.milestones.length > 0
-        if (isMobile && log) {
+        // Condiciones para mostrar el FAB de emergencia
+        const hasLog = !!log
+        const isActiveLog = log && log.status !== 'completed' && log.status !== 'draft'
+        const hasMilestones = !!(log?.milestones && log.milestones.length > 0)
+        const shouldShowFAB = isMobile && hasLog && isActiveLog && hasMilestones
+        
+        // Logs de depuración (siempre, para ayudar a diagnosticar problemas)
+        if (hasLog) {
           console.log('[MountainLogDetail] Condiciones FAB de emergencia:', {
             isMobile,
-            hasLog: !!log,
-            logStatus: log.status,
-            hasMilestones: !!(log.milestones && log.milestones.length > 0),
-            milestonesCount: log.milestones?.length || 0,
+            hasLog,
+            logStatus: log?.status,
+            isActiveLog,
+            hasMilestones,
+            milestonesCount: log?.milestones?.length || 0,
             shouldShowFAB,
-            isStandalone: window.matchMedia('(display-mode: standalone)').matches,
-            userAgent: navigator.userAgent,
-            windowWidth: window.innerWidth,
+            isStandalone: typeof window !== 'undefined' && (
+              // @ts-ignore
+              window.navigator.standalone === true || 
+              window.matchMedia('(display-mode: standalone)').matches
+            ),
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 80) : 'N/A',
+            windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'N/A',
           })
         }
+        
         return shouldShowFAB
       })() && (
         <>

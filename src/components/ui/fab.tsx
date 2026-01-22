@@ -86,6 +86,10 @@ export function FAB({
       style={{
         bottom: bottomValue,
         [position]: 'max(1rem, env(safe-area-inset-' + position + ', 1rem))',
+        // Asegurar que el FAB sea siempre visible
+        display: 'flex',
+        visibility: 'visible',
+        opacity: isExpanded ? 0.4 : 1,
       }}
     >
       <Button

@@ -7,7 +7,22 @@ const MOBILE_BREAKPOINT = 768
  * Incluye detección de PWA instalada (standalone mode)
  */
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+  // Inicializar con una verificación inmediata para evitar undefined
+  const [isMobile, setIsMobile] = React.useState<boolean>(() => {
+    // Verificación inicial síncrona
+    if (typeof window === 'undefined') return false
+    
+    const isSmallScreen = window.innerWidth < MOBILE_BREAKPOINT
+    const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    
+    // @ts-ignore - window.navigator.standalone es específico de iOS
+    const isStandalone = window.navigator.standalone === true || 
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches
+    
+    return isSmallScreen || isMobileUserAgent || isStandalone
+  })
 
   React.useEffect(() => {
     const checkMobile = () => {
@@ -26,10 +41,23 @@ export function useIsMobile() {
         window.matchMedia('(display-mode: minimal-ui)').matches
       
       // Es móvil si: pantalla pequeña, user agent móvil, o está en modo standalone
-      setIsMobile(isSmallScreen || isMobileUserAgent || isStandalone)
+      const mobile = isSmallScreen || isMobileUserAgent || isStandalone
+      setIsMobile(mobile)
+      
+      // Log para depuración en desarrollo
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[useIsMobile] Estado actualizado:', {
+          isSmallScreen,
+          isMobileUserAgent,
+          isStandalone,
+          mobile,
+          windowWidth: window.innerWidth,
+          userAgent: navigator.userAgent.substring(0, 50),
+        })
+      }
     }
     
-    // Verificar inmediatamente
+    // Verificar inmediatamente (aunque ya lo hicimos en el estado inicial)
     checkMobile()
     
     // Escuchar cambios de tamaño de ventana
@@ -46,5 +74,5 @@ export function useIsMobile() {
     }
   }, [])
 
-  return !!isMobile
+  return isMobile
 }
