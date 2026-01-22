@@ -1,4 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Mountain, Loader2 } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import { useActiveMountainLog } from '@/hooks/useActiveMountainLog'
@@ -6,11 +7,18 @@ import { useActiveEmergencies } from '@/hooks/useActiveEmergencies'
 import { useRecentMountainLogs } from '@/hooks/useRecentMountainLogs'
 import { ActiveMountainLogCard } from '@/components/home/ActiveMountainLogCard'
 import { ActiveEmergenciesCard } from '@/components/home/ActiveEmergenciesCard'
+import { GeneralStatistics } from '@/components/home/GeneralStatistics'
+import { FAB } from '@/components/ui/fab'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { useNavigate, Link } from 'react-router-dom'
 
 // Lazy load del mapa para mejorar LCP
 const MountainLogsMap = lazy(() => import('@/components/home/MountainLogsMap').then(module => ({ default: module.MountainLogsMap })))
 
 export default function Home() {
+  const navigate = useNavigate()
+  const isMobile = useIsMobile()
+  
   // Hooks para datos de montañistas
   const { activeLog, isLoading: isLoadingActiveLog } = useActiveMountainLog()
   const { activeEmergencies, isLoading: isLoadingEmergencies } = useActiveEmergencies()
@@ -63,12 +71,42 @@ export default function Home() {
         </div>
       }>
         <MountainLogsMap 
-          logs={allLogs} 
+          logs={allLogs}
+          emergencies={activeEmergencies}
           isLoading={isLoadingAllLogs} 
           showCurrentLocation={true}
           className="w-full mb-20 sm:mb-24"
         />
       </Suspense>
+
+      {/* Botón de Crear Bitácora - Desktop: Botón completo, Mobile: FAB */}
+      {!isMobile ? (
+        <Button size="lg" variant="default" className="w-full" asChild>
+          <Link to="/mountain-logs/new">
+            <Mountain className="mr-2 h-5 w-5" />
+            Crear Bitácora
+          </Link>
+        </Button>
+      ) : null}
+
+      {/* FAB para crear bitácora - Solo en móvil, posicionado a la izquierda para usuarios diestros */}
+      {isMobile && (
+        <FAB
+          icon={Mountain}
+          label="Crear Bitácora"
+          onClick={() => navigate('/mountain-logs/new')}
+          variant="default"
+          position="left"
+          bottomOffset={0} // Sin offset adicional para que coincida con el FAB de navegación
+          aria-label="Crear Bitácora"
+        />
+      )}
+      
+      {/* Estadísticas generales - Entre los FABs (móvil) o en la parte inferior (desktop) */}
+      <GeneralStatistics 
+        logs={allLogs} 
+        emergencies={activeEmergencies}
+      />
     </div>
   )
 }

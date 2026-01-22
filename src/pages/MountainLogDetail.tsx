@@ -18,6 +18,7 @@ import {
   Camera, 
   MapPin, 
   Play, 
+  Pause,
   Square, 
   Plus, 
   Trash2, 
@@ -1760,21 +1761,64 @@ export default function MountainLogDetail() {
           )}
         </div>
 
-        {/* Botón flotante para agregar milestone */}
-        {!isReadOnly && (
-          <div className="fixed bottom-20 right-4 z-20">
-            <Button
-              size="lg"
-              className="h-14 w-14 rounded-full shadow-lg"
+        {/* FABs de acción - Solo en móvil */}
+        {!isReadOnly && isMobile && (
+          <>
+            {/* FAB para agregar milestone - Derecha, más arriba */}
+            <FAB
+              icon={Plus}
+              label="Agregar Milestone"
               onClick={() => setShowAddMilestone(true)}
-            >
-              <Plus className="h-6 w-6" />
-            </Button>
-          </div>
+              variant="default"
+              position="right"
+              bottomOffset={44} // 11rem desde abajo (encima de otros FABs)
+              aria-label="Agregar Milestone"
+            />
+            
+            {/* FAB de Tracking GPS - Derecha, medio */}
+            {!isTracking ? (
+              <FAB
+                icon={Play}
+                label="Iniciar Tracking GPS"
+                onClick={handleStartTracking}
+                variant="default"
+                position="right"
+                bottomOffset={20} // 5rem desde abajo
+                secondaryIcon={Navigation} // Icono GPS secundario
+                disabled={!hasPermission}
+                aria-label="Iniciar Tracking GPS"
+              />
+            ) : (
+              <FAB
+                icon={Pause}
+                label="Detener Tracking GPS"
+                onClick={handleStopTracking}
+                variant="outline"
+                position="right"
+                bottomOffset={20} // 5rem desde abajo
+                secondaryIcon={Navigation} // Icono GPS secundario
+                aria-label="Detener Tracking GPS"
+              />
+            )}
+            
+            {/* FAB de Finalizar Bitácora - Izquierda, encima del de emergencia */}
+            {log.status !== 'completed' && (
+              <FAB
+                icon={CheckCircle}
+                label="Finalizar Bitácora"
+                onClick={handleFinalize}
+                variant="destructive"
+                position="left"
+                bottomOffset={20} // 5rem desde abajo (encima del de emergencia)
+                disabled={saving}
+                aria-label="Finalizar Bitácora"
+              />
+            )}
+          </>
         )}
 
-        {/* Botones de acción fijos en la parte inferior */}
-        {!isReadOnly && (
+        {/* Botones de acción para desktop - Barra inferior */}
+        {!isReadOnly && !isMobile && (
           <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 space-y-2 z-10 safe-area-bottom">
             {!isTracking ? (
               <Button
@@ -2005,14 +2049,16 @@ export default function MountainLogDetail() {
       )}
 
       {/* FAB de Emergencia - Solo en móvil cuando hay bitácora activa con milestone */}
-      {isMobile && log && log.status === 'active' && log.milestones && log.milestones.length > 0 && (
+      {isMobile && log && log.status !== 'completed' && log.status !== 'draft' && log.milestones && log.milestones.length > 0 && (
         <>
           <FAB
             icon={AlertTriangle}
-            label="Crear Emergencia"
+            label="Emergencia"
             onClick={() => setShowEmergencyDialog(true)}
             variant="destructive"
             position="left"
+            wide={true} // FAB alargado (el doble de ancho)
+            bottomOffset={4} // 1rem desde abajo (base)
             aria-label="Crear Emergencia"
           />
           {/* Diálogo de emergencia para móvil */}

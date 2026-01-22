@@ -37,9 +37,11 @@ export function BottomNav() {
 
   return (
     <>
-      {/* FAB Button - Posicionado para fácil acceso con el pulgar */}
-      <div 
-        className="fixed bottom-4 right-4 md:hidden z-[100] pointer-events-auto"
+      {/* FAB Button - Posicionado a la derecha (navegación) */}
+      <div
+        className={cn(
+          "fixed bottom-4 right-4 md:hidden z-[100] pointer-events-auto fab-navigation fab-dim"
+        )}
         style={{
           bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))',
           right: 'max(1rem, env(safe-area-inset-right, 1rem))',
@@ -49,7 +51,7 @@ export function BottomNav() {
           <SheetTrigger asChild>
             <Button
               size="lg"
-              className="h-14 w-14 rounded-full shadow-xl hover:shadow-2xl transition-all duration-200 bg-primary text-primary-foreground hover:bg-primary/90 border-2 border-primary/40"
+              className="h-14 w-14 rounded-full transition-all duration-200"
               aria-label="Abrir menú de navegación"
             >
               {isOpen ? (
@@ -74,8 +76,11 @@ export function BottomNav() {
               </SheetDescription>
             </SheetHeader>
             {/* Balance Display - Solo en móvil */}
-            <div className="mt-4 mb-4 px-1">
-              <BalanceDisplay />
+            <div className="mt-4 mb-4">
+              <div className="text-sm font-medium mb-2 px-1">Balance</div>
+              <div className="p-2 bg-muted rounded-lg">
+                <BalanceDisplay showIcon={true} />
+              </div>
             </div>
             {/* Selector de cuenta activa - Solo en móvil */}
             <div className="mt-4 mb-4">

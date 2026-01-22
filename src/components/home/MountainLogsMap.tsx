@@ -9,6 +9,7 @@ import { MapPin, Mountain, Loader2, AlertCircle, Navigation } from 'lucide-react
 import { Link, useNavigate } from 'react-router-dom'
 import type { MountainLog, GPSPoint } from '@/types/mountainLogs'
 import type { GPSMetadata } from '@/types/documents'
+import type { Emergency } from '@/types/emergencies'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { getCurrentGPSLocation } from '@/services/pdf/PDFMetadata'
@@ -27,10 +28,51 @@ const DefaultIcon = L.icon({
   shadowSize: [41, 41]
 })
 
+// Iconos de colores para diferentes estados de bitácoras
+const getLogIcon = (status: MountainLog['status']): L.Icon => {
+  let color: string
+  switch (status) {
+    case 'completed':
+      color = 'green' // Verde para completadas
+      break
+    case 'in_progress':
+      color = 'blue' // Azul para en progreso
+      break
+    case 'draft':
+      color = 'orange' // Naranja para borradores
+      break
+    case 'cancelled':
+      color = 'grey' // Gris para canceladas
+      break
+    default:
+      color = 'blue'
+  }
+  
+  return L.icon({
+    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41]
+  })
+}
+
+// Icono rojo para emergencias
+const EmergencyIcon = L.icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+})
+
 L.Marker.prototype.options.icon = DefaultIcon
 
 interface MountainLogsMapProps {
   logs: MountainLog[]
+  emergencies?: Emergency[] // Emergencias opcionales para mostrar en el mapa
   isLoading?: boolean
   showCurrentLocation?: boolean // Si mostrar ubicación actual cuando no hay bitácoras
   className?: string
@@ -72,11 +114,12 @@ function getLogLocation(log: MountainLog): { lat: number; lon: number } | null {
   return null
 }
 
-export function MountainLogsMap({ logs, isLoading, showCurrentLocation = true, className }: MountainLogsMapProps) {
+export function MountainLogsMap({ logs, emergencies = [], isLoading, showCurrentLocation = true, className }: MountainLogsMapProps) {
   const mapRef = useRef<L.Map | null>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const markersRef = useRef<L.Marker[]>([])
   const currentLocationMarkerRef = useRef<L.Marker | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const navigate = useNavigate()
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [mapError, setMapError] = useState<string | null>(null)
@@ -87,6 +130,11 @@ export function MountainLogsMap({ logs, isLoading, showCurrentLocation = true, c
 
   // Filtrar bitácoras con ubicación válida
   const logsWithLocation = logs.filter(log => getLogLocation(log) !== null)
+  
+  // Filtrar emergencias con ubicación válida
+  const emergenciesWithLocation = emergencies.filter(emergency => 
+    emergency.location?.latitude && emergency.location?.longitude
+  )
 
   // Obtener ubicación actual si no hay bitácoras
   useEffect(() => {
@@ -130,8 +178,8 @@ export function MountainLogsMap({ logs, isLoading, showCurrentLocation = true, c
       return
     }
 
-    // Si no hay bitácoras ni ubicación actual, no inicializar mapa
-    if (logsWithLocation.length === 0 && !currentLocation && !isLoadingLocation) {
+    // Si no hay bitácoras, emergencias ni ubicación actual, no inicializar mapa
+    if (logsWithLocation.length === 0 && emergenciesWithLocation.length === 0 && !currentLocation && !isLoadingLocation) {
       return
     }
 
@@ -148,17 +196,30 @@ export function MountainLogsMap({ logs, isLoading, showCurrentLocation = true, c
       let centerLon: number
       let initialZoom: number
 
-      if (logsWithLocation.length > 0) {
-        // Si hay bitácoras, usar promedio de sus ubicaciones
-        const locations = logsWithLocation
-          .map(log => getLogLocation(log))
-          .filter((loc): loc is { lat: number; lon: number } => loc !== null)
+      // Combinar ubicaciones de bitácoras y emergencias
+      const allLocations: { lat: number; lon: number }[] = []
+      
+      // Agregar ubicaciones de bitácoras
+      logsWithLocation.forEach(log => {
+        const location = getLogLocation(log)
+        if (location) allLocations.push(location)
+      })
+      
+      // Agregar ubicaciones de emergencias
+      emergenciesWithLocation.forEach(emergency => {
+        if (emergency.location?.latitude && emergency.location?.longitude) {
+          allLocations.push({
+            lat: emergency.location.latitude,
+            lon: emergency.location.longitude
+          })
+        }
+      })
 
-        if (locations.length === 0) return
-
-        centerLat = locations.reduce((sum, loc) => sum + loc.lat, 0) / locations.length
-        centerLon = locations.reduce((sum, loc) => sum + loc.lon, 0) / locations.length
-        initialZoom = 6 // Zoom amplio para ver todas las bitácoras
+      if (allLocations.length > 0) {
+        // Si hay bitácoras o emergencias, usar promedio de sus ubicaciones
+        centerLat = allLocations.reduce((sum, loc) => sum + loc.lat, 0) / allLocations.length
+        centerLon = allLocations.reduce((sum, loc) => sum + loc.lon, 0) / allLocations.length
+        initialZoom = 6 // Zoom amplio para ver todas las ubicaciones
       } else if (currentLocation) {
         // Si no hay bitácoras pero hay ubicación actual, usar esa
         centerLat = currentLocation.latitude
@@ -229,24 +290,51 @@ export function MountainLogsMap({ logs, isLoading, showCurrentLocation = true, c
           currentLocationMarkerRef.current = marker
         }
 
-        // Agregar marcadores para cada bitácora
+        // Agregar marcadores para cada bitácora con iconos según estado
         logsWithLocation.forEach((log) => {
           const location = getLogLocation(log)
           if (!location) return
 
-          const marker = L.marker([location.lat, location.lon]).addTo(map)
+          const marker = L.marker([location.lat, location.lon], {
+            icon: getLogIcon(log.status),
+            zIndexOffset: 100 // Bitácoras por debajo de emergencias
+          }).addTo(map)
 
           // Crear popup con información de la bitácora
           const popupContent = document.createElement('div')
           popupContent.className = 'text-sm min-w-[200px]'
+          
+          // Determinar texto y emoji según estado
+          let statusText = ''
+          let statusEmoji = ''
+          switch (log.status) {
+            case 'completed':
+              statusText = 'Completada'
+              statusEmoji = '✅'
+              break
+            case 'in_progress':
+              statusText = 'En Progreso'
+              statusEmoji = '🟢'
+              break
+            case 'draft':
+              statusText = 'Borrador'
+              statusEmoji = '📝'
+              break
+            case 'cancelled':
+              statusText = 'Cancelada'
+              statusEmoji = '❌'
+              break
+            default:
+              statusText = 'Desconocido'
+              statusEmoji = '❓'
+          }
+          
           popupContent.innerHTML = `
             <h3 class="font-semibold mb-1">${log.title}</h3>
             ${log.mountainName ? `<p class="text-xs text-muted-foreground mb-1">🏔️ ${log.mountainName}</p>` : ''}
             ${log.location ? `<p class="text-xs text-muted-foreground mb-1">📍 ${log.location}</p>` : ''}
             <p class="text-xs text-muted-foreground mb-2">
-              ${log.status === 'active' ? '🟢 Activa' : 
-                log.status === 'completed' ? '✅ Completada' : 
-                '📝 Borrador'}
+              ${statusEmoji} ${statusText}
             </p>
             <button 
               class="text-xs text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
@@ -270,27 +358,88 @@ export function MountainLogsMap({ logs, isLoading, showCurrentLocation = true, c
           markersRef.current.push(marker)
         })
 
+        // Agregar marcadores para emergencias (rojos, por encima de bitácoras)
+        emergenciesWithLocation.forEach((emergency) => {
+          if (!emergency.location?.latitude || !emergency.location?.longitude) return
+
+          const marker = L.marker(
+            [emergency.location.latitude, emergency.location.longitude],
+            {
+              icon: EmergencyIcon,
+              zIndexOffset: 1000 // Emergencias siempre por encima
+            }
+          ).addTo(map)
+
+          // Crear popup con información de la emergencia
+          const popupContent = document.createElement('div')
+          popupContent.className = 'text-sm min-w-[200px]'
+          popupContent.innerHTML = `
+            <h3 class="font-semibold text-destructive mb-1">🚨 ${emergency.type || 'Emergencia'}</h3>
+            ${emergency.description ? `<p class="text-xs text-muted-foreground mb-1">${emergency.description.substring(0, 100)}${emergency.description.length > 100 ? '...' : ''}</p>` : ''}
+            <p class="text-xs text-muted-foreground mb-1">
+              Severidad: ${emergency.severity || 'N/A'}
+            </p>
+            <p class="text-xs text-muted-foreground mb-2">
+              Estado: ${emergency.status || 'N/A'}
+            </p>
+            <a 
+              href="/emergencies/${emergency.emergencyId}"
+              class="text-xs text-destructive hover:underline inline-flex items-center gap-1 cursor-pointer"
+            >
+              Ver detalles →
+            </a>
+          `
+
+          marker.bindPopup(popupContent)
+          markersRef.current.push(marker)
+        })
+
         // Ajustar vista para mostrar todos los marcadores (después de que todos estén agregados)
-        setTimeout(() => {
+        timeoutRef.current = setTimeout(() => {
+          // Verificar que el mapa aún existe y está inicializado
+          if (!mapRef.current || !mapContainerRef.current) {
+            return
+          }
+          
+          const currentMap = mapRef.current
+          
+          // Verificar que el mapa no ha sido destruido
+          try {
+            if (!currentMap.getContainer() || !currentMap.getContainer().parentElement) {
+              return
+            }
+          } catch (error) {
+            console.warn('[MountainLogsMap] El mapa ya fue destruido:', error)
+            return
+          }
+          
           if (markersRef.current.length > 0) {
             try {
               const group = new L.FeatureGroup(markersRef.current)
               const bounds = group.getBounds()
               if (bounds && bounds.isValid()) {
-                map.fitBounds(bounds.pad(0.1), { animate: false })
+                currentMap.fitBounds(bounds.pad(0.1), { animate: false })
               }
             } catch (error) {
               console.warn('[MountainLogsMap] Error al ajustar bounds:', error)
               // Fallback: centrar en el primer marcador
               if (markersRef.current.length > 0) {
-                const firstMarker = markersRef.current[0]
-                const pos = firstMarker.getLatLng()
-                map.setView([pos.lat, pos.lng], initialZoom, { animate: false })
+                try {
+                  const firstMarker = markersRef.current[0]
+                  const pos = firstMarker.getLatLng()
+                  currentMap.setView([pos.lat, pos.lng], initialZoom, { animate: false })
+                } catch (error) {
+                  console.warn('[MountainLogsMap] Error al centrar en primer marcador:', error)
+                }
               }
             }
           } else if (currentLocationMarkerRef.current && currentLocation) {
             // Si solo hay ubicación actual, centrar en ella
-            map.setView([currentLocation.latitude, currentLocation.longitude], 13, { animate: false })
+            try {
+              currentMap.setView([currentLocation.latitude, currentLocation.longitude], 13, { animate: false })
+            } catch (error) {
+              console.warn('[MountainLogsMap] Error al centrar en ubicación actual:', error)
+            }
           }
         }, 100)
       })
@@ -301,14 +450,43 @@ export function MountainLogsMap({ logs, isLoading, showCurrentLocation = true, c
 
     // Cleanup
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove()
-        mapRef.current = null
-        markersRef.current = []
+      // Limpiar timeout si existe
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+      
+      // Limpiar marcadores
+      markersRef.current.forEach(marker => {
+        try {
+          marker.remove()
+        } catch (error) {
+          // Ignorar errores al limpiar marcadores
+        }
+      })
+      markersRef.current = []
+      
+      // Limpiar marcador de ubicación actual
+      if (currentLocationMarkerRef.current) {
+        try {
+          currentLocationMarkerRef.current.remove()
+        } catch (error) {
+          // Ignorar errores al limpiar marcador
+        }
         currentLocationMarkerRef.current = null
       }
+      
+      // Limpiar mapa
+      if (mapRef.current) {
+        try {
+          mapRef.current.remove()
+        } catch (error) {
+          // Ignorar errores al limpiar mapa
+        }
+        mapRef.current = null
+      }
     }
-  }, [logsWithLocation, isLoading, isOnline, currentLocation, isLoadingLocation])
+  }, [logsWithLocation, emergenciesWithLocation, isLoading, isOnline, currentLocation, isLoadingLocation])
 
   if (isLoading || isLoadingLocation) {
     return (
@@ -334,14 +512,14 @@ export function MountainLogsMap({ logs, isLoading, showCurrentLocation = true, c
     )
   }
 
-  // Si no hay bitácoras ni ubicación actual
-  if (logsWithLocation.length === 0 && !currentLocation) {
+  // Si no hay bitácoras, emergencias ni ubicación actual
+  if (logsWithLocation.length === 0 && emergenciesWithLocation.length === 0 && !currentLocation) {
     return (
       <div className={className}>
         <div className="flex flex-col items-center justify-center h-[calc(100vh-12rem)] sm:h-[calc(100vh-10rem)] space-y-4 text-center">
           <AlertCircle className="h-16 w-16 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            No hay bitácoras con ubicación GPS disponible
+            No hay bitácoras o emergencias con ubicación GPS disponible
           </p>
           <p className="text-xs text-muted-foreground">
             {showCurrentLocation ? 'Permite el acceso a tu ubicación para ver tu posición en el mapa' : 'Crea una bitácora y agrega milestones con GPS para verlas en el mapa'}

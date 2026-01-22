@@ -4,7 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme {
+:root {
   --radius: 0.5rem;
 
   /* Light Mode - Colores con tinte azul según estándares UI/UX */
@@ -100,43 +100,42 @@ body {
   --sidebar-ring: 212.7 26.8% 83.9%;
 }
 
-/* Variables inline para Tailwind CSS v4 */
-@theme inline {
-  /* Colores principales */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
+/* Exponer variables a Tailwind CSS v4 */
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
   /* Charts */
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
   /* Sidebar */
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
   /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -249,18 +248,21 @@ button[class*="bg-muted"],
   -webkit-backdrop-filter: none !important;
 }
 
-/* Estilos para FABs */
-.fab-emergency button {
-  background-color: hsl(var(--destructive)) !important;
-  color: hsl(var(--destructive-foreground)) !important;
-  border: 2px solid hsl(var(--destructive) / 0.4) !important;
+/* FABs con colores sólidos y visibles siempre */
+.fab-emergency,
+.fab-navigation {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  /* Asegurar que no haya padding o margin que afecte la alineación */
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.fab-navigation button {
-  background-color: hsl(var(--primary)) !important;
-  color: hsl(var(--primary-foreground)) !important;
-  border: 2px solid hsl(var(--primary) / 0.6) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+/* Estado dim para FABs cuando hay expansión */
+.fab-dim {
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .fab-dim-active {
@@ -271,6 +273,118 @@ button[class*="bg-muted"],
 .fab-dim-active:focus-within {
   opacity: 1;
   transform: scale(1.05);
+}
+
+/* Asegurar que los FABs sean visibles cuando se necesita interactuar */
+.fab-dim-active:active {
+  opacity: 1;
+}
+
+/* FAB de emergencia - Rojo sólido y visible (izquierda para usuarios diestros) */
+.fab-emergency button {
+  background-color: hsl(var(--destructive)) !important;
+  color: hsl(var(--destructive-foreground)) !important;
+  border: 2px solid hsl(var(--destructive) / 0.4) !important;
+  box-shadow: 
+    0 4px 14px 0 rgba(239, 68, 68, 0.4),
+    0 0 0 0 rgba(239, 68, 68, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* FAB alargado (wide) - Para emergencia (el doble de ancho) */
+.fab-wide button {
+  border-radius: 9999px !important; /* Mantener rounded-full */
+  min-width: 7rem !important; /* w-28 = 7rem (el doble de w-14) */
+  width: 7rem !important;
+}
+
+@media (min-width: 768px) {
+  .fab-wide button {
+    min-width: 8rem !important; /* w-32 = 8rem en desktop (el doble de w-16) */
+    width: 8rem !important;
+  }
+}
+
+.fab-emergency button:hover {
+  background-color: hsl(var(--destructive) / 0.95) !important;
+  box-shadow: 
+    0 6px 20px 0 rgba(239, 68, 68, 0.5),
+    0 0 0 4px rgba(239, 68, 68, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.fab-emergency button:active {
+  background-color: hsl(var(--destructive) / 0.9) !important;
+  transform: scale(0.95);
+}
+
+/* FAB de navegación - Azul sólido y visible (derecha) */
+.fab-navigation button {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border: 2px solid hsl(var(--primary) / 0.4) !important;
+  box-shadow: 
+    0 4px 14px 0 rgba(59, 130, 246, 0.4),
+    0 0 0 0 rgba(59, 130, 246, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.fab-navigation button:hover {
+  background-color: hsl(var(--primary) / 0.95) !important;
+  box-shadow: 
+    0 6px 20px 0 rgba(59, 130, 246, 0.5),
+    0 0 0 4px rgba(59, 130, 246, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.fab-navigation button:active {
+  background-color: hsl(var(--primary) / 0.9) !important;
+  transform: scale(0.95);
+}
+
+/* Dark mode - Asegurar contraste en ambos modos */
+.dark .fab-emergency button {
+  background-color: hsl(var(--destructive)) !important;
+  border-color: hsl(var(--destructive) / 0.5) !important;
+  box-shadow: 
+    0 4px 14px 0 rgba(239, 68, 68, 0.5),
+    0 0 0 0 rgba(239, 68, 68, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .fab-navigation button {
+  background-color: hsl(var(--primary)) !important;
+  border-color: hsl(var(--primary) / 0.5) !important;
+  box-shadow: 
+    0 4px 14px 0 rgba(59, 130, 246, 0.5),
+    0 0 0 0 rgba(59, 130, 246, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* FAB con variant outline - Para botones secundarios */
+.fab-navigation button[data-variant="outline"],
+.fab-navigation button.variant-outline {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  border: 2px solid hsl(var(--primary) / 0.5) !important;
+  box-shadow: 
+    0 4px 14px 0 rgba(0, 0, 0, 0.2),
+    0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.fab-navigation button[data-variant="outline"]:hover,
+.fab-navigation button.variant-outline:hover {
+  background-color: hsl(var(--muted)) !important;
+  border-color: hsl(var(--primary) / 0.7) !important;
+  box-shadow: 
+    0 6px 20px 0 rgba(0, 0, 0, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+.dark .fab-navigation button[data-variant="outline"],
+.dark .fab-navigation button.variant-outline {
+  background-color: hsl(var(--card)) !important;
+  border-color: hsl(var(--primary) / 0.6) !important;
 }
 
 /* Asegurar que todos los elementos con bg-background tengan fondo sólido */
@@ -315,4 +429,3 @@ button.theme-toggle-button:hover,
 button[class*="theme-toggle-button"]:hover {
   background-color: hsl(var(--muted) / 0.8) !important;
 }
-

@@ -180,21 +180,62 @@ async function tryConnectWithFallback(
       // Agregar un manejador de errores no capturados para eventos internos
       // Esto previene que errores internos de Dedot rompan la aplicación
       if (typeof window !== 'undefined') {
+        // Función helper para detectar errores internos de Dedot
+        const isDedotInternalError = (message: string, error?: Error): boolean => {
+          const errorString = String(message)
+          const stack = error?.stack || ''
+          const hasHashError = errorString.includes('hash') && 
+            (errorString.includes('undefined') || errorString.includes('Cannot read properties'))
+          const hasStackHashError = stack.includes('hash') && 
+            (stack.includes('undefined') || stack.includes('Cannot read properties'))
+          const hasOnFollowEventError = stack.includes('#onFollowEvent') && 
+            (errorString.includes('hash') || errorString.includes('undefined'))
+          const hasDedotJsError = stack.includes('dedot.js') && errorString.includes('hash')
+          
+          return hasHashError || hasStackHashError || hasOnFollowEventError || hasDedotJsError
+        }
+
+        // Manejador de errores síncronos
         const originalErrorHandler = window.onerror
         window.onerror = (message, source, lineno, colno, error) => {
-          // Ignorar errores específicos de Dedot relacionados con 'hash' y 'onFollowEvent'
-          if (
-            (typeof message === 'string' && message.includes('hash') && message.includes('onFollowEvent')) ||
-            (error?.message?.includes('hash') && error?.stack?.includes('onFollowEvent'))
-          ) {
-            console.warn('[DedotClient] ⚠️ Error interno de Dedot ignorado:', message)
+          const messageStr = typeof message === 'string' ? message : String(message)
+          if (isDedotInternalError(messageStr, error)) {
+            // Solo loguear en modo debug para no saturar la consola
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[DedotClient] ⚠️ Error interno de Dedot ignorado:', messageStr.substring(0, 100))
+            }
             return true // Prevenir que el error se propague
           }
           // Llamar al manejador original para otros errores
           if (originalErrorHandler) {
-            return originalErrorHandler(message, source, lineno, colno, error)
+            const result = originalErrorHandler(message, source, lineno, colno, error)
+            return result === true
           }
           return false
+        }
+
+        // Manejador de promesas rechazadas (errores asíncronos)
+        const originalRejectionHandler = window.onunhandledrejection
+        window.onunhandledrejection = (event: PromiseRejectionEvent) => {
+          const reason = event.reason
+          const error = reason instanceof Error ? reason : new Error(String(reason))
+          const message = error.message || String(reason)
+          
+          if (isDedotInternalError(message, error)) {
+            // Solo loguear en modo debug para no saturar la consola
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[DedotClient] ⚠️ Promesa rechazada de Dedot ignorada:', message.substring(0, 100))
+            }
+            event.preventDefault() // Prevenir que el error se propague
+            return
+          }
+          
+          // Llamar al manejador original para otros errores
+          if (originalRejectionHandler) {
+            if (typeof originalRejectionHandler === 'function') {
+              originalRejectionHandler.call(window, event)
+            }
+          }
         }
       }
       
