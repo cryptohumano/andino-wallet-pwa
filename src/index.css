@@ -253,11 +253,19 @@ button[class*="bg-muted"],
 .fab-navigation {
   transition: opacity 0.3s ease, transform 0.3s ease;
   /* Asegurar que no haya padding o margin que afecte la alineación */
-  padding: 0;
-  margin: 0;
-  display: flex;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
   align-items: center;
   justify-content: center;
+  /* Forzar que esté fuera del flujo y visible */
+  position: fixed !important;
+  z-index: 100 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  /* Asegurar que no esté oculto por overflow de contenedores padres */
+  contain: none !important;
+  isolation: isolate;
 }
 
 /* Estado dim para FABs cuando hay expansión */

@@ -6,6 +6,7 @@
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { LucideIcon } from 'lucide-react'
+import { createPortal } from 'react-dom'
 
 interface FABProps {
   icon: LucideIcon
@@ -71,7 +72,19 @@ export function FAB({
     ? 'max(1rem, env(safe-area-inset-bottom, 1rem))'
     : `calc(max(1rem, env(safe-area-inset-bottom, 1rem)) + ${bottomOffset * 0.25}rem)`
   
-  return (
+  // Log para diagnóstico (temporal)
+  if (variant === 'destructive') {
+    console.log('[FAB] 🔍 Renderizando FAB de emergencia:', {
+      variant,
+      position,
+      wide,
+      bottomOffset,
+      bottomValue,
+      isExpanded,
+    })
+  }
+  
+  const fabContent = (
     <div
       className={cn(
         'fixed z-[100] pointer-events-auto',
@@ -86,13 +99,16 @@ export function FAB({
       style={{
         bottom: bottomValue,
         [position]: 'max(1rem, env(safe-area-inset-' + position + ', 1rem))',
-        // Asegurar que el FAB sea siempre visible
-        display: 'flex',
-        visibility: 'visible',
+        // Asegurar que el FAB sea siempre visible - FORZAR con !important
+        display: 'flex !important',
+        visibility: 'visible !important',
         opacity: isExpanded ? 0.4 : 1,
         // Forzar visibilidad - importante para diagnóstico
-        position: 'fixed',
-        zIndex: 100,
+        position: 'fixed !important',
+        zIndex: '100 !important',
+        // Asegurar que no esté oculto por overflow
+        contain: 'none',
+        isolation: 'isolate',
       }}
       data-fab-visible="true"
       data-fab-variant={variant}
@@ -126,4 +142,12 @@ export function FAB({
       </Button>
     </div>
   )
+  
+  // Usar Portal para renderizar fuera de cualquier contenedor con overflow
+  // Esto asegura que el FAB siempre sea visible
+  if (typeof document !== 'undefined') {
+    return createPortal(fabContent, document.body)
+  }
+  
+  return fabContent
 }
