@@ -2051,9 +2051,10 @@ export default function MountainLogDetail() {
         const hasMilestones = !!(log?.milestones && log.milestones.length > 0)
         const shouldShowFAB = isMobile && hasLog && isActiveLog && hasMilestones
         
-        // Logs de depuración solo en desarrollo
-        if (hasLog && import.meta.env.DEV) {
-          console.log('[MountainLogDetail] Condiciones FAB de emergencia:', {
+        // Logs de depuración - SIEMPRE mostrar para diagnosticar el problema en móvil
+        // TODO: Cambiar a import.meta.env.DEV después de resolver el problema
+        if (hasLog) {
+          console.log('[MountainLogDetail] 🔍 DIAGNÓSTICO FAB de emergencia:', {
             isMobile,
             hasLog,
             logStatus: log?.status,
@@ -2066,8 +2067,20 @@ export default function MountainLogDetail() {
               window.navigator.standalone === true || 
               window.matchMedia('(display-mode: standalone)').matches
             ),
-            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 80) : 'N/A',
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 100) : 'N/A',
             windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'N/A',
+            windowHeight: typeof window !== 'undefined' ? window.innerHeight : 'N/A',
+            // Información adicional para diagnóstico
+            allConditions: {
+              'isMobile': isMobile,
+              'hasLog': hasLog,
+              'isActiveLog': isActiveLog,
+              'hasMilestones': hasMilestones,
+            },
+            failingCondition: !isMobile ? 'isMobile=false' : 
+                              !hasLog ? 'hasLog=false' :
+                              !isActiveLog ? `isActiveLog=false (status: ${log?.status})` :
+                              !hasMilestones ? 'hasMilestones=false' : 'NONE - debería mostrarse'
           })
         }
         

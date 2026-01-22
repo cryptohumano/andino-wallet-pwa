@@ -44,17 +44,21 @@ export function useIsMobile() {
       const mobile = isSmallScreen || isMobileUserAgent || isStandalone
       setIsMobile(mobile)
       
-      // Log para depuración solo en desarrollo
-      if (import.meta.env.DEV) {
-        console.log('[useIsMobile] Estado actualizado:', {
-          isSmallScreen,
-          isMobileUserAgent,
-          isStandalone,
-          mobile,
-          windowWidth: window.innerWidth,
-          userAgent: navigator.userAgent.substring(0, 50),
-        })
-      }
+      // Log para depuración - SIEMPRE mostrar para diagnosticar problema en móvil
+      // TODO: Cambiar a import.meta.env.DEV después de resolver el problema
+      console.log('[useIsMobile] 🔍 Estado actualizado:', {
+        isSmallScreen,
+        isMobileUserAgent,
+        isStandalone,
+        mobile,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+        userAgent: navigator.userAgent.substring(0, 100),
+        // @ts-ignore
+        navigatorStandalone: typeof window !== 'undefined' ? window.navigator.standalone : 'N/A',
+        displayModeStandalone: typeof window !== 'undefined' ? window.matchMedia('(display-mode: standalone)').matches : 'N/A',
+        displayModeFullscreen: typeof window !== 'undefined' ? window.matchMedia('(display-mode: fullscreen)').matches : 'N/A',
+      })
     }
     
     // Verificar inmediatamente (aunque ya lo hicimos en el estado inicial)

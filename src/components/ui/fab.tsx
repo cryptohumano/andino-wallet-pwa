@@ -90,7 +90,13 @@ export function FAB({
         display: 'flex',
         visibility: 'visible',
         opacity: isExpanded ? 0.4 : 1,
+        // Forzar visibilidad - importante para diagnóstico
+        position: 'fixed',
+        zIndex: 100,
       }}
+      data-fab-visible="true"
+      data-fab-variant={variant}
+      data-fab-position={position}
     >
       <Button
         size={size}
