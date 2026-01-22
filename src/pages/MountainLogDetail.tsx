@@ -58,7 +58,6 @@ import { generateMountainLogPDF } from '@/services/mountainLogs/mountainLogPDFGe
 import { EmergencyButton } from '@/components/emergencies/EmergencyButton'
 import { EmergencyPanel } from '@/components/emergencies/EmergencyPanel'
 import { FAB } from '@/components/ui/fab'
-import { AlertTriangle } from 'lucide-react'
 import { downloadPDF } from '@/utils/pdfUtils'
 import SignatureSelector from '@/components/signatures/SignatureSelector'
 import type { Document } from '@/types/documents'
@@ -95,7 +94,6 @@ export default function MountainLogDetail() {
   const [selectedMilestoneDescription, setSelectedMilestoneDescription] = useState<{ title: string; description: string } | null>(null)
   const [showSignDialog, setShowSignDialog] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
-  const [showEmergencyDialog, setShowEmergencyDialog] = useState(false)
   const [document, setDocument] = useState<Document | null>(null)
   const { accounts, getAccount } = useKeyringContext()
 
@@ -1400,18 +1398,17 @@ export default function MountainLogDetail() {
                     }
                   </p>
                 </div>
-                {!isMobile && (
-                  <EmergencyButton 
-                    log={log}
-                    currentLocation={currentLocation}
-                    onEmergencyCreated={(emergencyId) => {
-                      if (import.meta.env.DEV) {
-                        console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
-                      }
-                      toast.info('Emergencia activa. Revisa el estado en el panel de emergencias.')
-                    }}
-                  />
-                )}
+                {/* EmergencyButton maneja automáticamente FAB en móvil y botón en desktop */}
+                <EmergencyButton 
+                  log={log}
+                  currentLocation={currentLocation}
+                  onEmergencyCreated={(emergencyId) => {
+                    if (import.meta.env.DEV) {
+                      console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
+                    }
+                    toast.info('Emergencia activa. Revisa el estado en el panel de emergencias.')
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
@@ -2043,84 +2040,6 @@ export default function MountainLogDetail() {
         </Dialog>
       )}
 
-      {/* FAB de Emergencia - Solo en móvil cuando hay bitácora activa con milestone */}
-      {(() => {
-        // Condiciones para mostrar el FAB de emergencia
-        const hasLog = !!log
-        const isActiveLog = log && log.status !== 'completed' && log.status !== 'draft'
-        const hasMilestones = !!(log?.milestones && log.milestones.length > 0)
-        const shouldShowFAB = isMobile && hasLog && isActiveLog && hasMilestones
-        
-        // Logs de depuración - SIEMPRE mostrar para diagnosticar el problema en móvil
-        // TODO: Cambiar a import.meta.env.DEV después de resolver el problema
-        if (hasLog) {
-          console.log('[MountainLogDetail] 🔍 DIAGNÓSTICO FAB de emergencia:', {
-            isMobile,
-            hasLog,
-            logStatus: log?.status,
-            isActiveLog,
-            hasMilestones,
-            milestonesCount: log?.milestones?.length || 0,
-            shouldShowFAB,
-            isStandalone: typeof window !== 'undefined' && (
-              // @ts-ignore
-              window.navigator.standalone === true || 
-              window.matchMedia('(display-mode: standalone)').matches
-            ),
-            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 100) : 'N/A',
-            windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'N/A',
-            windowHeight: typeof window !== 'undefined' ? window.innerHeight : 'N/A',
-            // Información adicional para diagnóstico
-            allConditions: {
-              'isMobile': isMobile,
-              'hasLog': hasLog,
-              'isActiveLog': isActiveLog,
-              'hasMilestones': hasMilestones,
-            },
-            failingCondition: !isMobile ? 'isMobile=false' : 
-                              !hasLog ? 'hasLog=false' :
-                              !isActiveLog ? `isActiveLog=false (status: ${log?.status})` :
-                              !hasMilestones ? 'hasMilestones=false' : 'NONE - debería mostrarse'
-          })
-        }
-        
-        return shouldShowFAB
-      })() && (
-        <>
-          <FAB
-            icon={AlertTriangle}
-            label="Emergencia"
-            onClick={() => setShowEmergencyDialog(true)}
-            variant="destructive"
-            position="left"
-            wide={true} // FAB alargado (el doble de ancho)
-            bottomOffset={4} // 1rem desde abajo (base)
-            aria-label="Crear Emergencia"
-          />
-          {/* Diálogo de emergencia para móvil */}
-          <Dialog open={showEmergencyDialog} onOpenChange={setShowEmergencyDialog}>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Crear Emergencia</DialogTitle>
-                <DialogDescription>
-                  Reporta una emergencia que será registrada en la blockchain
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <EmergencyButton 
-                  log={log}
-                  currentLocation={currentLocation}
-                  onEmergencyCreated={(emergencyId) => {
-                    console.log('[MountainLogDetail] Emergencia creada:', emergencyId)
-                    toast.info('Emergencia activa. Revisa el estado en el panel de emergencias.')
-                    setShowEmergencyDialog(false)
-                  }}
-                />
-              </div>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
     </div>
   )
 }

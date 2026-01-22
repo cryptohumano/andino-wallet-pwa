@@ -1,9 +1,11 @@
 /**
  * Componente: Botón de Emergencia
  * Permite activar una emergencia desde la bitácora
+ * En móvil muestra un FAB, en desktop muestra un botón normal
  */
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
 import {
@@ -26,6 +28,8 @@ import {
 import { toast } from 'sonner'
 import { useEmergency } from '@/hooks/useEmergency'
 import { useGPSTracking } from '@/hooks/useGPSTracking'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 import type { EmergencyType, EmergencySeverity, GPSPoint } from '@/types/emergencies'
 import type { MountainLog } from '@/types/mountainLogs'
 
@@ -33,12 +37,15 @@ interface EmergencyButtonProps {
   log: MountainLog
   currentLocation?: GPSPoint | null
   onEmergencyCreated?: (emergencyId: string) => void
+  /** Forzar modo móvil o desktop (opcional, por defecto usa useIsMobile) */
+  forceMobile?: boolean
 }
 
 export function EmergencyButton({ 
   log, 
   currentLocation: propCurrentLocation,
-  onEmergencyCreated 
+  onEmergencyCreated,
+  forceMobile
 }: EmergencyButtonProps) {
   const [open, setOpen] = useState(false)
   const [type, setType] = useState<EmergencyType>('medical')
@@ -46,6 +53,8 @@ export function EmergencyButton({
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
   
+  const isMobile = useIsMobile()
+  const shouldShowFAB = forceMobile !== undefined ? forceMobile : isMobile
   const { createAndSubmitEmergency } = useEmergency()
   
   // GPS tracking para obtener ubicación actual
@@ -236,6 +245,165 @@ export function EmergencyButton({
     }
   }
 
+  // Contenido del diálogo (compartido entre FAB y botón)
+  const dialogContent = (
+    <DialogContent className="sm:max-w-[500px]">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2 text-destructive">
+          <AlertTriangle className="h-6 w-6" />
+          Activar Emergencia
+        </DialogTitle>
+        <DialogDescription>
+          Esta acción enviará una alerta de emergencia a la blockchain.
+          Solo úsala en situaciones reales de emergencia.
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div className="space-y-4 py-4">
+        <div className="space-y-2">
+          <Label htmlFor="emergency-type">Tipo de Emergencia *</Label>
+          <Select value={type} onValueChange={(value) => setType(value as EmergencyType)}>
+            <SelectTrigger id="emergency-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="medical">Médica</SelectItem>
+              <SelectItem value="rescue">Rescate</SelectItem>
+              <SelectItem value="weather">Condiciones Climáticas</SelectItem>
+              <SelectItem value="equipment">Fallo de Equipo</SelectItem>
+              <SelectItem value="lost">Extraviado</SelectItem>
+              <SelectItem value="injury">Lesión</SelectItem>
+              <SelectItem value="illness">Enfermedad</SelectItem>
+              <SelectItem value="avalanche">Avalancha</SelectItem>
+              <SelectItem value="rockfall">Caída de Rocas</SelectItem>
+              <SelectItem value="other">Otra</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="emergency-severity">Severidad *</Label>
+          <Select value={severity} onValueChange={(value) => setSeverity(value as EmergencySeverity)}>
+            <SelectTrigger id="emergency-severity">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Baja</SelectItem>
+              <SelectItem value="medium">Media</SelectItem>
+              <SelectItem value="high">Alta</SelectItem>
+              <SelectItem value="critical">Crítica</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="emergency-description">
+            Descripción {severity !== 'critical' && '*'}
+          </Label>
+          <Textarea
+            id="emergency-description"
+            placeholder="Describe brevemente la situación de emergencia..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+          />
+          {severity === 'critical' && (
+            <p className="text-xs text-muted-foreground">
+              Para emergencias críticas, la descripción es opcional pero recomendada.
+            </p>
+          )}
+        </div>
+
+        {currentLocation && (
+          <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
+            📍 Ubicación: {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+            {currentLocation.altitude && ` (${Math.round(currentLocation.altitude)}m)`}
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-4">
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            disabled={submitting}
+            className="flex-1"
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleCreateEmergency}
+            disabled={submitting}
+            className="flex-1"
+          >
+            {submitting ? 'Enviando...' : 'Confirmar Emergencia'}
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  )
+
+  // Verificar condiciones para mostrar el botón/FAB
+  const hasMilestones = !!(log.milestones && log.milestones.length > 0)
+  const isActiveLog = log.status !== 'completed' && log.status !== 'draft'
+  const canShowEmergency = hasMilestones && isActiveLog
+
+  // Si es móvil, mostrar FAB con Portal (solo si cumple condiciones)
+  if (shouldShowFAB && canShowEmergency) {
+    const fabContent = (
+      <div
+        className={cn(
+          'fixed z-[100] pointer-events-auto',
+          'left-4 md:left-6',
+          'fab-emergency',
+          'fab-wide',
+          'safe-area-inset-bottom',
+          'safe-area-inset-left'
+        )}
+        style={{
+          bottom: 'calc(max(1rem, env(safe-area-inset-bottom, 1rem)) + 1rem)',
+          left: 'max(1rem, env(safe-area-inset-left, 1rem))',
+          display: 'flex',
+          visibility: 'visible',
+          position: 'fixed',
+          zIndex: 100,
+        }}
+      >
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="destructive"
+              size="lg"
+              className="h-14 w-28 px-4 rounded-full gap-2"
+              disabled={!hasMilestones}
+              title={!hasMilestones ? 'Agrega al menos un milestone antes de activar una emergencia' : 'Activar emergencia'}
+            >
+              <AlertTriangle className="h-6 w-6 flex-shrink-0" />
+              <span className="text-sm font-medium whitespace-nowrap">Emergencia</span>
+            </Button>
+          </DialogTrigger>
+          {dialogContent}
+        </Dialog>
+      </div>
+    )
+
+    // Renderizar FAB usando Portal directamente en document.body
+    if (typeof document !== 'undefined') {
+      return createPortal(fabContent, document.body)
+    }
+    return fabContent
+  }
+
+  // Si es móvil pero no cumple condiciones, no mostrar nada
+  if (shouldShowFAB && !canShowEmergency) {
+    return null
+  }
+
+  // Si es desktop, mostrar botón normal (solo si cumple condiciones)
+  if (!canShowEmergency) {
+    return null
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -243,107 +411,14 @@ export function EmergencyButton({
           variant="destructive"
           size="lg"
           className="w-full sm:w-auto gap-2"
-          disabled={!log.milestones || log.milestones.length === 0}
-          title={(!log.milestones || log.milestones.length === 0) ? 'Agrega al menos un milestone antes de activar una emergencia' : 'Activar emergencia'}
+          disabled={!hasMilestones}
+          title={!hasMilestones ? 'Agrega al menos un milestone antes de activar una emergencia' : 'Activar emergencia'}
         >
           <AlertTriangle className="h-5 w-5" />
           EMERGENCIA
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-6 w-6" />
-            Activar Emergencia
-          </DialogTitle>
-          <DialogDescription>
-            Esta acción enviará una alerta de emergencia a la blockchain.
-            Solo úsala en situaciones reales de emergencia.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="emergency-type">Tipo de Emergencia *</Label>
-            <Select value={type} onValueChange={(value) => setType(value as EmergencyType)}>
-              <SelectTrigger id="emergency-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="medical">Médica</SelectItem>
-                <SelectItem value="rescue">Rescate</SelectItem>
-                <SelectItem value="weather">Condiciones Climáticas</SelectItem>
-                <SelectItem value="equipment">Fallo de Equipo</SelectItem>
-                <SelectItem value="lost">Extraviado</SelectItem>
-                <SelectItem value="injury">Lesión</SelectItem>
-                <SelectItem value="illness">Enfermedad</SelectItem>
-                <SelectItem value="avalanche">Avalancha</SelectItem>
-                <SelectItem value="rockfall">Caída de Rocas</SelectItem>
-                <SelectItem value="other">Otra</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="emergency-severity">Severidad *</Label>
-            <Select value={severity} onValueChange={(value) => setSeverity(value as EmergencySeverity)}>
-              <SelectTrigger id="emergency-severity">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Baja</SelectItem>
-                <SelectItem value="medium">Media</SelectItem>
-                <SelectItem value="high">Alta</SelectItem>
-                <SelectItem value="critical">Crítica</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="emergency-description">
-              Descripción {severity !== 'critical' && '*'}
-            </Label>
-            <Textarea
-              id="emergency-description"
-              placeholder="Describe brevemente la situación de emergencia..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-            />
-            {severity === 'critical' && (
-              <p className="text-xs text-muted-foreground">
-                Para emergencias críticas, la descripción es opcional pero recomendada.
-              </p>
-            )}
-          </div>
-
-          {currentLocation && (
-            <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
-              📍 Ubicación: {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
-              {currentLocation.altitude && ` (${Math.round(currentLocation.altitude)}m)`}
-            </div>
-          )}
-
-          <div className="flex gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={submitting}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleCreateEmergency}
-              disabled={submitting}
-              className="flex-1"
-            >
-              {submitting ? 'Enviando...' : 'Confirmar Emergencia'}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
+      {dialogContent}
     </Dialog>
   )
 }
