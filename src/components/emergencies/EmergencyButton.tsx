@@ -345,11 +345,36 @@ export function EmergencyButton({
 
   // Verificar condiciones para mostrar el botón/FAB
   const hasMilestones = !!(log.milestones && log.milestones.length > 0)
-  const isActiveLog = log.status !== 'completed' && log.status !== 'draft'
+  // Permitir emergencias en bitácoras 'in_progress' o 'cancelled' (pero no 'completed' ni 'draft')
+  const isActiveLog = log.status === 'in_progress' || log.status === 'cancelled'
   const canShowEmergency = hasMilestones && isActiveLog
+
+  // Logs de diagnóstico (temporal - siempre mostrar)
+  console.log('[EmergencyButton] 🔍 Diagnóstico:', {
+    shouldShowFAB,
+    isMobile,
+    hasMilestones,
+    milestonesCount: log.milestones?.length || 0,
+    isActiveLog,
+    logStatus: log.status,
+    canShowEmergency,
+    willRenderFAB: shouldShowFAB && canShowEmergency,
+    willRenderButton: !shouldShowFAB && canShowEmergency,
+    willReturnNull: !canShowEmergency,
+    // Información adicional
+    logId: log.logId,
+    logTitle: log.title,
+    statusCheck: {
+      isInProgress: log.status === 'in_progress',
+      isCancelled: log.status === 'cancelled',
+      isCompleted: log.status === 'completed',
+      isDraft: log.status === 'draft',
+    }
+  })
 
   // Si es móvil, mostrar FAB con Portal (solo si cumple condiciones)
   if (shouldShowFAB && canShowEmergency) {
+    console.log('[EmergencyButton] 🚨 RENDERIZANDO FAB DE EMERGENCIA')
     const fabContent = (
       <div
         className={cn(
@@ -361,13 +386,16 @@ export function EmergencyButton({
           'safe-area-inset-left'
         )}
         style={{
-          bottom: 'calc(max(1rem, env(safe-area-inset-bottom, 1rem)) + 1rem)',
+          // Posicionar en la posición base (sin offset adicional)
+          // El FAB de "Finalizar" está a 5rem (bottomOffset=20), este está en la base
+          bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))',
           left: 'max(1rem, env(safe-area-inset-left, 1rem))',
           display: 'flex',
           visibility: 'visible',
           position: 'fixed',
           zIndex: 100,
         }}
+        data-emergency-fab="true"
       >
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -388,9 +416,12 @@ export function EmergencyButton({
     )
 
     // Renderizar FAB usando Portal directamente en document.body
-    if (typeof document !== 'undefined') {
+    // Esto asegura que esté fuera de cualquier contenedor con overflow
+    if (typeof document !== 'undefined' && document.body) {
+      console.log('[EmergencyButton] ✅ Renderizando FAB con Portal en document.body')
       return createPortal(fabContent, document.body)
     }
+    console.warn('[EmergencyButton] ⚠️ No se pudo crear Portal, document.body no disponible')
     return fabContent
   }
 
