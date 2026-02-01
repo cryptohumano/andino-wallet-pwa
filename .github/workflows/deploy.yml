@@ -8,6 +8,7 @@ on:
       - documents
       - andino
       - feature/ui-improvements
+      - feature/async-logbook
   workflow_dispatch:
 
 permissions:
