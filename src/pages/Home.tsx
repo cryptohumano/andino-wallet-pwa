@@ -13,7 +13,19 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { useNavigate, Link } from 'react-router-dom'
 
 // Lazy load del mapa para mejorar LCP
-const MountainLogsMap = lazy(() => import('@/components/home/MountainLogsMap').then(module => ({ default: module.MountainLogsMap })))
+// Si falla el import (por ejemplo, después de un deploy con nuevos hashes), recarga la página
+const MountainLogsMap = lazy(() => 
+  import('@/components/home/MountainLogsMap')
+    .then(module => ({ default: module.MountainLogsMap }))
+    .catch((error) => {
+      console.error('[Home] Error al cargar MountainLogsMap, recargando página:', error)
+      // Solo recargar si es un error de fetch/import (nuevo deploy)
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('dynamically imported module')) {
+        window.location.reload()
+      }
+      throw error
+    })
+)
 
 export default function Home() {
   const navigate = useNavigate()
