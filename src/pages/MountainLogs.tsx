@@ -30,6 +30,7 @@ export default function MountainLogs() {
   const [logs, setLogs] = useState<MountainLog[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<MountainLogStatus | 'all'>('all')
+  const [filterType, setFilterType] = useState<'all' | 'active' | 'historical'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [filterAccount, setFilterAccount] = useState<string>('all')
 
@@ -56,7 +57,17 @@ export default function MountainLogs() {
         loadedLogs = await getAllMountainLogs()
       }
       
-      // Luego filtrar por estado si no es 'all'
+      // Aplicar filtros de tipo y estado
+      // Nota: Los filtros de tipo y estado se aplican aquí para optimizar la carga
+      // El filtro de búsqueda de texto se aplica después en filteredLogs
+      if (filterType !== 'all') {
+        if (filterType === 'historical') {
+          loadedLogs = loadedLogs.filter(log => log.isHistorical === true)
+        } else if (filterType === 'active') {
+          loadedLogs = loadedLogs.filter(log => !log.isHistorical)
+        }
+      }
+      
       if (filterStatus !== 'all') {
         loadedLogs = loadedLogs.filter(log => log.status === filterStatus)
       }
@@ -70,11 +81,11 @@ export default function MountainLogs() {
     }
   }
 
-  // Recargar bitácoras cuando cambia el estado, el filtro de cuenta o la cuenta activa
+  // Recargar bitácoras cuando cambia el estado, tipo, el filtro de cuenta o la cuenta activa
   useEffect(() => {
     loadLogs()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterStatus, filterAccount, activeAccount])
+  }, [filterStatus, filterType, filterAccount, activeAccount])
 
   const filteredLogs = logs.filter(log => {
     if (!searchQuery) return true
@@ -213,15 +224,46 @@ export default function MountainLogs() {
                 </Select>
               </div>
             )}
-            
+
+            {/* Filtro por tipo de bitácora (Activas/Históricas) */}
             <div className="flex gap-2 flex-wrap">
+              <span className="text-xs sm:text-sm text-muted-foreground self-center mr-2">Tipo:</span>
+              <Button
+                variant={filterType === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilterType('all')}
+                className="text-xs sm:text-sm"
+              >
+                Todas
+              </Button>
+              <Button
+                variant={filterType === 'active' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilterType('active')}
+                className="text-xs sm:text-sm"
+              >
+                Activas
+              </Button>
+              <Button
+                variant={filterType === 'historical' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilterType('historical')}
+                className="text-xs sm:text-sm"
+              >
+                Históricas
+              </Button>
+            </div>
+            
+            {/* Filtro por estado */}
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-xs sm:text-sm text-muted-foreground self-center mr-2">Estado:</span>
               <Button
                 variant={filterStatus === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilterStatus('all')}
                 className="text-xs sm:text-sm"
               >
-                Todas
+                Todos
               </Button>
               <Button
                 variant={filterStatus === 'draft' ? 'default' : 'outline'}
@@ -277,12 +319,12 @@ export default function MountainLogs() {
               <div>
                 <h3 className="text-lg font-semibold">No hay bitácoras</h3>
                 <p className="text-muted-foreground mt-1">
-                  {searchQuery || filterStatus !== 'all'
+                  {searchQuery || filterStatus !== 'all' || filterType !== 'all'
                     ? 'No se encontraron bitácoras con los filtros aplicados'
                     : 'Comienza creando tu primera bitácora de montañismo'}
                 </p>
               </div>
-              {!searchQuery && filterStatus === 'all' && (
+              {!searchQuery && filterStatus === 'all' && filterType === 'all' && (
                 <Button onClick={handleCreateNew} className="mt-4">
                   <Plus className="mr-2 h-4 w-4" />
                   Crear Primera Bitácora
@@ -313,6 +355,9 @@ export default function MountainLogs() {
                   <Badge variant={getStatusBadgeVariant(log.status)}>
                     {getStatusLabel(log.status)}
                   </Badge>
+                  {log.isHistorical && (
+                    <Badge variant="outline">Histórica</Badge>
+                  )}
                   {log.isTrackingActive && (
                     <Badge variant="secondary">Tracking Activo</Badge>
                   )}

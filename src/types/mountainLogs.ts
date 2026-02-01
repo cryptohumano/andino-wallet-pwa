@@ -39,6 +39,17 @@ export interface MountainLogImage {
   tags?: string[] // Etiquetas para búsqueda
 }
 
+export interface MountainLogFile {
+  id: string // UUID del archivo
+  name: string // Nombre del archivo
+  type: string // MIME type (ej: 'application/pdf', 'text/plain')
+  data: string // Archivo en base64 o blob URL
+  size: number // Tamaño en bytes
+  uploadedAt: number // Timestamp de subida
+  description?: string // Descripción opcional del archivo
+  tags?: string[] // Etiquetas para búsqueda
+}
+
 export interface MountainLogEntry {
   id: string // UUID de la entrada
   timestamp: number
@@ -62,6 +73,15 @@ export interface MountainLogMilestone {
   // Imágenes asociadas
   images: MountainLogImage[]
   
+  // Archivos asociados (para bitácoras históricas)
+  files?: MountainLogFile[]
+  
+  // Indica si el timestamp fue ingresado manualmente (bitácoras históricas)
+  manualTimestamp?: boolean
+  
+  // Indica si el GPS fue ingresado manualmente (bitácoras históricas)
+  manualGPS?: boolean
+  
   // Notas adicionales
   notes?: string
   
@@ -72,6 +92,13 @@ export interface MountainLogMilestone {
     temperature?: number
     duration?: number // Duración desde el milestone anterior (en segundos)
     distance?: number // Distancia desde el milestone anterior (en metros)
+    // Campos para bitácoras históricas
+    fechaInicio?: string // Fecha de inicio (formato YYYY-MM-DD)
+    horaInicio?: string // Hora de inicio (formato HH:mm)
+    fechaLlegada?: string // Fecha de llegada (formato YYYY-MM-DD)
+    horaLlegada?: string // Hora de llegada (formato HH:mm)
+    fechaSalida?: string // Fecha de salida (formato YYYY-MM-DD)
+    horaSalida?: string // Hora de salida (formato HH:mm)
     [key: string]: any
   }
   
@@ -108,6 +135,9 @@ export interface MountainLog {
   
   // Estado
   status: MountainLogStatus
+  
+  // Tipo de bitácora
+  isHistorical?: boolean // true = bitácora histórica (sin aviso de salida, permite entrada manual)
   
   // Fechas
   startDate: number // Timestamp de inicio

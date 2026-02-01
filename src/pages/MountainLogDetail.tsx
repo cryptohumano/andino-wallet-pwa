@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -91,16 +91,30 @@ export default function MountainLogDetail() {
   const [showPlaneacion, setShowPlaneacion] = useState(false)
   const [showAvisoSalida, setShowAvisoSalida] = useState(false)
   const [showAvisoSalidaView, setShowAvisoSalidaView] = useState(false)
+  const [showLogTypeSelector, setShowLogTypeSelector] = useState(false) // Selector de tipo de bitácora
   const [selectedMilestoneDescription, setSelectedMilestoneDescription] = useState<{ title: string; description: string } | null>(null)
   const [showSignDialog, setShowSignDialog] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
   const [document, setDocument] = useState<Document | null>(null)
   const { accounts, getAccount } = useKeyringContext()
+  const { activeAccount } = useActiveAccount()
 
   // Form state para nuevo milestone
   const [newMilestoneTitle, setNewMilestoneTitle] = useState('')
   const [newMilestoneType, setNewMilestoneType] = useState<MountainLogMilestone['type']>('checkpoint')
   const [newMilestoneDescription, setNewMilestoneDescription] = useState('')
+  // Para bitácoras históricas: entrada manual de GPS
+  const [manualGPS, setManualGPS] = useState({ latitude: '', longitude: '', altitude: '' })
+  const [gpxFile, setGpxFile] = useState<File | null>(null)
+  // Para bitácoras históricas: fechas y horas manuales
+  const [manualDateTime, setManualDateTime] = useState({
+    fechaInicio: '',
+    horaInicio: '',
+    fechaLlegada: '',
+    horaLlegada: '',
+    fechaSalida: '',
+    horaSalida: ''
+  })
 
   // GPS Tracking
   const {
@@ -119,37 +133,23 @@ export default function MountainLogDetail() {
   })
 
   useEffect(() => {
-    if (logId) {
-      loadLog()
-    } else {
-      // Crear nueva bitácora - mostrar formulario de Aviso de Salida
-      // Asignar la cuenta actual (primera cuenta disponible o seleccionada)
-      const currentAccount = accounts.length > 0 ? accounts[0].address : undefined
-      
-      const newLog: MountainLog = {
-        logId: uuidv4(),
-        title: 'Nueva Bitácora',
-        description: '',
-        status: 'draft',
-        startDate: Date.now(),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        trackingMode: 'manual',
-        isTrackingActive: false,
-        routes: [],
-        milestones: [],
-        entries: [],
-        images: [],
-        gpsPoints: [],
-        synced: false,
-        relatedAccount: currentAccount // Asignar cuenta al crear
-      }
-      setLog(newLog)
-      // Mostrar planeación primero (opcional)
-      setShowPlaneacion(true)
+    // Si logId es "new" o undefined, mostrar selector de tipo
+    if (!logId || logId === 'new') {
+      // Crear nueva bitácora - mostrar selector de tipo primero
+      setShowLogTypeSelector(true)
       setLoading(false)
+    } else {
+      // Cargar bitácora existente solo si no está ya en el estado con el mismo logId
+      // Esto evita recargar cuando ya tenemos el log (por ejemplo, después de crear una histórica)
+      if (!log || log.logId !== logId) {
+        loadLog()
+      } else {
+        // Si ya tenemos el log correcto, solo asegurar que no esté en estado de carga
+        setLoading(false)
+      }
     }
-  }, [logId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logId]) // Solo dependemos de logId, no de log para evitar loops
 
   const loadLog = async () => {
     if (!logId) return
@@ -413,44 +413,126 @@ export default function MountainLogDetail() {
     }
 
     try {
-      // Intentar obtener ubicación GPS actual si no está disponible
-      let gpsPoint = currentLocation
-      if (!gpsPoint) {
-        try {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 5000,
-              maximumAge: 0
+      // En bitácoras históricas, NO intentar obtener GPS automático
+      // Solo se permite entrada manual o archivos GPX
+      let gpsPoint: GPSPoint | undefined = undefined
+      
+      if (!log.isHistorical) {
+        // Bitácoras activas: intentar obtener GPS automático
+        gpsPoint = currentLocation
+        if (!gpsPoint) {
+          try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 0
+              })
             })
-          })
-          gpsPoint = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            altitude: position.coords.altitude ?? undefined,
-            accuracy: position.coords.accuracy ?? undefined,
-            timestamp: position.timestamp || Date.now()
+            gpsPoint = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              altitude: position.coords.altitude ?? undefined,
+              accuracy: position.coords.accuracy ?? undefined,
+              timestamp: position.timestamp || Date.now()
+            }
+            
+            // Validar el punto GPS
+            const validation = validateGPSPoint(gpsPoint, currentLocation || undefined)
+            if (!validation.isValid || validation.confidence < 70) {
+              toast.warning('Ubicación GPS con baja confianza', {
+                description: validation.warnings.join('; ') || 'Posible GPS falso detectado'
+              })
+              // Marcar como sospechoso pero aún así guardarlo
+              ;(gpsPoint as any).suspicious = true
+              ;(gpsPoint as any).confidence = validation.confidence
+            } else {
+              toast.success('Ubicación GPS capturada')
+            }
+          } catch (gpsError) {
+            console.warn('No se pudo obtener ubicación GPS:', gpsError)
+            toast.info('Milestone creado sin ubicación GPS')
           }
-          
-          // Validar el punto GPS
-          const validation = validateGPSPoint(gpsPoint, currentLocation || undefined)
-          if (!validation.isValid || validation.confidence < 70) {
-            toast.warning('Ubicación GPS con baja confianza', {
-              description: validation.warnings.join('; ') || 'Posible GPS falso detectado'
-            })
-            // Marcar como sospechoso pero aún así guardarlo
-            ;(gpsPoint as any).suspicious = true
-            ;(gpsPoint as any).confidence = validation.confidence
-          } else {
-            toast.success('Ubicación GPS capturada')
+        }
+      }
+      // En históricas, gpsPoint queda undefined (se puede agregar manualmente después)
+
+      // En bitácoras históricas, procesar GPS manual o GPX
+      if (log.isHistorical) {
+        // Si hay coordenadas manuales, usarlas
+        if (manualGPS.latitude && manualGPS.longitude) {
+          const lat = parseFloat(manualGPS.latitude)
+          const lon = parseFloat(manualGPS.longitude)
+          if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+            gpsPoint = {
+              latitude: lat,
+              longitude: lon,
+              altitude: manualGPS.altitude ? parseFloat(manualGPS.altitude) : undefined,
+              timestamp: Date.now(),
+              accuracy: undefined
+            }
+            // Marcar como manual
+            ;(gpsPoint as any).manual = true
           }
-        } catch (gpsError) {
-          console.warn('No se pudo obtener ubicación GPS:', gpsError)
-          toast.info('Milestone creado sin ubicación GPS')
+        }
+        // Si hay archivo GPX, procesarlo (se puede usar para múltiples milestones en el futuro)
+        if (gpxFile) {
+          try {
+            const { parseGPX, convertGPXWaypointsToGPSPoints } = await import('@/utils/gpxParser')
+            const parsed = await parseGPX(gpxFile)
+            if (parsed.waypoints.length > 0) {
+              // Usar el primer waypoint del GPX para este milestone
+              const waypoints = convertGPXWaypointsToGPSPoints(parsed.waypoints)
+              if (waypoints.length > 0) {
+                gpsPoint = waypoints[0]
+                ;(gpsPoint as any).fromGPX = true
+                toast.success(`GPS extraído del archivo GPX (${parsed.waypoints.length} waypoints encontrados)`)
+              }
+            }
+          } catch (error) {
+            console.error('Error al procesar GPX:', error)
+            toast.error('Error al procesar archivo GPX')
+          }
         }
       }
 
-      const timestamp = Date.now()
+      // Calcular timestamp: para históricas, usar fecha/hora manual si está disponible
+      let timestamp = Date.now()
+      let metadata: MountainLogMilestone['metadata'] = {}
+      
+      if (log.isHistorical) {
+        // Procesar fechas y horas manuales
+        const fechaInicio = manualDateTime.fechaInicio
+        const horaInicio = manualDateTime.horaInicio
+        const fechaLlegada = manualDateTime.fechaLlegada
+        const horaLlegada = manualDateTime.horaLlegada
+        const fechaSalida = manualDateTime.fechaSalida
+        const horaSalida = manualDateTime.horaSalida
+
+        // Si hay fecha de inicio, usarla como timestamp principal
+        if (fechaInicio) {
+          const fechaInicioDate = new Date(fechaInicio)
+          if (horaInicio) {
+            const [hours, minutes] = horaInicio.split(':').map(Number)
+            fechaInicioDate.setHours(hours || 0, minutes || 0, 0, 0)
+          }
+          timestamp = fechaInicioDate.getTime()
+        }
+
+        // Guardar todas las fechas/horas en metadata
+        if (fechaInicio || horaInicio || fechaLlegada || horaLlegada || fechaSalida || horaSalida) {
+          metadata = {
+            ...metadata,
+            fechaInicio: fechaInicio || undefined,
+            horaInicio: horaInicio || undefined,
+            fechaLlegada: fechaLlegada || undefined,
+            horaLlegada: horaLlegada || undefined,
+            fechaSalida: fechaSalida || undefined,
+            horaSalida: horaSalida || undefined,
+          }
+        }
+      }
+
       const milestone: MountainLogMilestone = {
         id: uuidv4(),
         timestamp,
@@ -459,7 +541,10 @@ export default function MountainLogDetail() {
         type: newMilestoneType,
         gpsPoint: gpsPoint || undefined,
         images: [],
-        order: log.milestones.length
+        order: log.milestones.length,
+        manualGPS: log.isHistorical ? !!manualGPS.latitude : undefined,
+        manualTimestamp: log.isHistorical ? true : undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined
       }
 
       const updatedLog: MountainLog = {
@@ -481,6 +566,16 @@ export default function MountainLogDetail() {
       setNewMilestoneTitle('')
       setNewMilestoneDescription('')
       setNewMilestoneType('checkpoint')
+      setManualGPS({ latitude: '', longitude: '', altitude: '' })
+      setGpxFile(null)
+      setManualDateTime({
+        fechaInicio: '',
+        horaInicio: '',
+        fechaLlegada: '',
+        horaLlegada: '',
+        fechaSalida: '',
+        horaSalida: ''
+      })
       setShowAddMilestone(false)
       
       toast.success('Milestone agregado')
@@ -1109,24 +1204,134 @@ export default function MountainLogDetail() {
 
   const isReadOnly = log?.status === 'completed'
 
-  if (loading) {
+  // Mostrar selector de tipo de bitácora si es nueva (PRIMERO, antes de otros checks)
+  if (showLogTypeSelector && (!logId || logId === 'new')) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Cargando...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Crear Nueva Bitácora</CardTitle>
+            <CardDescription>
+              Selecciona el tipo de bitácora que deseas crear
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              variant="outline"
+              className="w-full h-auto p-6 flex flex-col items-start gap-3"
+              onClick={() => {
+                // Bitácora activa (con aviso de salida)
+                const currentAccount = activeAccount || (accounts.length > 0 ? accounts[0].address : undefined)
+                const newLog: MountainLog = {
+                  logId: uuidv4(),
+                  title: 'Nueva Bitácora',
+                  description: '',
+                  status: 'draft',
+                  isHistorical: false,
+                  startDate: Date.now(),
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                  trackingMode: 'manual',
+                  isTrackingActive: false,
+                  routes: [],
+                  milestones: [],
+                  entries: [],
+                  images: [],
+                  gpsPoints: [],
+                  synced: false,
+                  relatedAccount: currentAccount
+                }
+                setLog(newLog)
+                setShowLogTypeSelector(false)
+                setShowPlaneacion(true)
+              }}
+            >
+              <div className="flex items-center gap-3 w-full">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Play className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="font-semibold">Bitácora Activa</div>
+                  <div className="text-sm text-muted-foreground">
+                    Para expediciones en tiempo real con aviso de salida
+                  </div>
+                </div>
+              </div>
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="w-full h-auto p-6 flex flex-col items-start gap-3"
+              onClick={async () => {
+                // Bitácora histórica (sin aviso de salida)
+                const currentAccount = activeAccount || (accounts.length > 0 ? accounts[0].address : undefined)
+                const newLog: MountainLog = {
+                  logId: uuidv4(),
+                  title: 'Nueva Bitácora Histórica',
+                  description: '',
+                  status: 'draft',
+                  isHistorical: true,
+                  startDate: Date.now(),
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                  trackingMode: 'manual',
+                  isTrackingActive: false,
+                  routes: [],
+                  milestones: [],
+                  entries: [],
+                  images: [],
+                  gpsPoints: [],
+                  synced: false,
+                  relatedAccount: currentAccount
+                }
+                setShowLogTypeSelector(false)
+                // Establecer el log en el estado ANTES de guardar y navegar
+                // Esto evita el error de renderizado momentáneo
+                setLog(newLog)
+                setLoading(false) // Asegurar que no esté en estado de carga
+                // Guardar primero y luego navegar
+                try {
+                  await saveMountainLog(newLog)
+                  toast.success('Bitácora histórica creada')
+                  // Navegar usando react-router para mantener el estado
+                  navigate(`/mountain-logs/${newLog.logId}`, { replace: true })
+                } catch (error) {
+                  console.error('Error al guardar bitácora histórica:', error)
+                  toast.error('Error al guardar la bitácora')
+                  setShowLogTypeSelector(true) // Volver a mostrar el selector si hay error
+                  setLog(null) // Limpiar el log si hay error
+                }
+              }}
+            >
+              <div className="flex items-center gap-3 w-full">
+                <div className="p-2 bg-muted rounded-lg">
+                  <Clock className="h-6 w-6" />
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="font-semibold">Bitácora Histórica</div>
+                  <div className="text-sm text-muted-foreground">
+                    Para digitalizar bitácoras antiguas sin aviso de salida
+                  </div>
+                </div>
+              </div>
+            </Button>
+          </CardContent>
+          <CardContent>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => navigate('/mountain-logs')}
+            >
+              Cancelar
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
-  if (!log) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Bitácora no encontrada</div>
-      </div>
-    )
-  }
-
-  // Mostrar formulario de Planeación si es nueva bitácora
-  if (showPlaneacion && !logId) {
+  // Mostrar formulario de Planeación si es nueva bitácora activa
+  if (showPlaneacion && (!logId || logId === 'new') && log) {
     return (
       <div className="min-h-screen bg-background">
         <div className="sticky top-0 z-10 bg-background border-b">
@@ -1177,8 +1382,9 @@ export default function MountainLogDetail() {
     )
   }
 
-  // Mostrar formulario de Aviso de Salida si es nueva bitácora
-  if (showAvisoSalida && !logId) {
+
+  // Mostrar formulario de Aviso de Salida si es nueva bitácora activa
+  if (showAvisoSalida && (!logId || logId === 'new') && log && !log.isHistorical) {
     return (
       <div className="min-h-screen bg-background">
         <div className="sticky top-0 z-10 bg-background border-b">
@@ -1227,12 +1433,45 @@ export default function MountainLogDetail() {
               mountainName: log.avisoSalida?.actividad.lugarDestino || '',
               // Asignar cuenta activa si no está asignada (solo al crear)
               relatedAccount: log.relatedAccount || currentAccount,
+              // Cambiar estado de "draft" a "in_progress" cuando se completa el aviso de salida
+              status: log.status === 'draft' ? 'in_progress' : log.status,
             }
             setLog(updatedLog)
             await saveMountainLog(updatedLog)
+            toast.success('Aviso de salida completado. Bitácora en progreso.')
             navigate(`/mountain-logs/${log.logId}`)
           }}
         />
+      </div>
+    )
+  }
+
+  // Si estamos cargando, mostrar estado de carga
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Cargando bitácora...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Si no hay log y no es una nueva bitácora, mostrar error
+  if (!log && logId && logId !== 'new') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Bitácora no encontrada</p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => navigate('/mountain-logs')}
+          >
+            Volver a Bitácoras
+          </Button>
+        </div>
       </div>
     )
   }
@@ -1384,8 +1623,8 @@ export default function MountainLogDetail() {
           }}
         />
 
-        {/* Botón de Emergencia - Siempre visible cuando hay bitácora activa */}
-        {!isReadOnly && (
+        {/* Botón de Emergencia - Solo visible en bitácoras activas (no históricas) */}
+        {!isReadOnly && !log.isHistorical && (
           <Card className="border-destructive/50 bg-destructive/5" data-emergency-section>
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
@@ -1513,8 +1752,8 @@ export default function MountainLogDetail() {
           </Card>
         )}
 
-        {/* Información de tracking */}
-        {isTracking && (
+        {/* Información de tracking - Solo para bitácoras activas */}
+        {isTracking && !log.isHistorical && (
           <Card className="bg-primary/10 border-primary/20">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -1753,8 +1992,8 @@ export default function MountainLogDetail() {
           )}
         </div>
 
-        {/* FABs de acción - Solo en móvil */}
-        {!isReadOnly && isMobile && (
+        {/* FABs de acción - Solo en móvil y solo para bitácoras activas */}
+        {!isReadOnly && isMobile && !log.isHistorical && (
           <>
             {/* FAB para agregar milestone - Derecha, más arriba */}
             <FAB
@@ -1809,8 +2048,35 @@ export default function MountainLogDetail() {
           </>
         )}
 
-        {/* Botones de acción para desktop - Barra inferior */}
-        {!isReadOnly && !isMobile && (
+        {/* FABs para bitácoras históricas (agregar milestone y finalizar) */}
+        {!isReadOnly && isMobile && log.isHistorical && (
+          <>
+            <FAB
+              icon={Plus}
+              label="Agregar Milestone"
+              onClick={() => setShowAddMilestone(true)}
+              variant="default"
+              position="right"
+              bottomOffset={44}
+              aria-label="Agregar Milestone"
+            />
+            {log.status !== 'completed' && (
+              <FAB
+                icon={CheckCircle}
+                label="Finalizar Bitácora"
+                onClick={handleFinalize}
+                variant="destructive"
+                position="left"
+                bottomOffset={20}
+                disabled={saving}
+                aria-label="Finalizar Bitácora"
+              />
+            )}
+          </>
+        )}
+
+        {/* Botones de acción para desktop - Barra inferior para bitácoras activas */}
+        {!isReadOnly && !isMobile && !log.isHistorical && (
           <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 space-y-2 z-10 safe-area-bottom">
             {!isTracking ? (
               <Button
@@ -1843,15 +2109,32 @@ export default function MountainLogDetail() {
             )}
           </div>
         )}
+
+        {/* Botones de acción para desktop - Barra inferior para bitácoras históricas */}
+        {!isReadOnly && !isMobile && log.isHistorical && log.status !== 'completed' && (
+          <div className="fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-10 safe-area-bottom">
+            <Button
+              variant="destructive"
+              className="w-full"
+              onClick={handleFinalize}
+              disabled={saving}
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Finalizar Bitácora Histórica
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Dialog para agregar milestone */}
       <Dialog open={showAddMilestone} onOpenChange={setShowAddMilestone}>
-        <DialogContent className="sm:max-w-[425px] mx-4">
+        <DialogContent className={`mx-4 max-h-[90vh] overflow-y-auto ${log.isHistorical ? 'sm:max-w-[600px]' : 'sm:max-w-[425px]'}`}>
           <DialogHeader>
             <DialogTitle>Nuevo Milestone</DialogTitle>
             <DialogDescription>
-              Agrega un nuevo hito a tu bitácora
+              {log.isHistorical 
+                ? 'Agrega un nuevo hito a tu bitácora histórica. Todos los campos son manuales.'
+                : 'Agrega un nuevo hito a tu bitácora'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1897,7 +2180,8 @@ export default function MountainLogDetail() {
               />
             </div>
 
-            {currentLocation && (
+            {/* Para bitácoras activas: mostrar GPS automático */}
+            {!log.isHistorical && currentLocation && (
               <div className="p-3 bg-muted rounded-lg text-xs">
                 <div className="flex items-center gap-2 mb-1">
                   <MapPin className="h-3 w-3" />
@@ -1906,6 +2190,146 @@ export default function MountainLogDetail() {
                 <div className="text-muted-foreground">
                   {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
                   {currentLocation.altitude && ` • ${Math.round(currentLocation.altitude)}m`}
+                </div>
+              </div>
+            )}
+
+            {/* Para bitácoras históricas: entrada manual completa */}
+            {log.isHistorical && (
+              <div className="space-y-4">
+                {/* Fechas y Horas */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-semibold">Fechas y Horas</Label>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="fecha-inicio" className="text-xs">Fecha de Inicio</Label>
+                      <Input
+                        id="fecha-inicio"
+                        type="date"
+                        value={manualDateTime.fechaInicio}
+                        onChange={(e) => setManualDateTime({ ...manualDateTime, fechaInicio: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hora-inicio" className="text-xs">Hora de Inicio</Label>
+                      <Input
+                        id="hora-inicio"
+                        type="time"
+                        value={manualDateTime.horaInicio}
+                        onChange={(e) => setManualDateTime({ ...manualDateTime, horaInicio: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fecha-llegada" className="text-xs">Fecha de Llegada</Label>
+                      <Input
+                        id="fecha-llegada"
+                        type="date"
+                        value={manualDateTime.fechaLlegada}
+                        onChange={(e) => setManualDateTime({ ...manualDateTime, fechaLlegada: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hora-llegada" className="text-xs">Hora de Llegada</Label>
+                      <Input
+                        id="hora-llegada"
+                        type="time"
+                        value={manualDateTime.horaLlegada}
+                        onChange={(e) => setManualDateTime({ ...manualDateTime, horaLlegada: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fecha-salida" className="text-xs">Fecha de Salida</Label>
+                      <Input
+                        id="fecha-salida"
+                        type="date"
+                        value={manualDateTime.fechaSalida}
+                        onChange={(e) => setManualDateTime({ ...manualDateTime, fechaSalida: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="hora-salida" className="text-xs">Hora de Salida</Label>
+                      <Input
+                        id="hora-salida"
+                        type="time"
+                        value={manualDateTime.horaSalida}
+                        onChange={(e) => setManualDateTime({ ...manualDateTime, horaSalida: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    La fecha y hora de inicio se usarán como timestamp del milestone. Las demás fechas se guardarán como metadata.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Coordenadas GPS (Manual)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="manual-lat" className="text-xs">Latitud</Label>
+                      <Input
+                        id="manual-lat"
+                        type="number"
+                        step="any"
+                        value={manualGPS.latitude}
+                        onChange={(e) => setManualGPS({ ...manualGPS, latitude: e.target.value })}
+                        placeholder="-33.4489"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="manual-lon" className="text-xs">Longitud</Label>
+                      <Input
+                        id="manual-lon"
+                        type="number"
+                        step="any"
+                        value={manualGPS.longitude}
+                        onChange={(e) => setManualGPS({ ...manualGPS, longitude: e.target.value })}
+                        placeholder="-70.6693"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="manual-alt" className="text-xs">Altitud (m)</Label>
+                      <Input
+                        id="manual-alt"
+                        type="number"
+                        step="any"
+                        value={manualGPS.altitude}
+                        onChange={(e) => setManualGPS({ ...manualGPS, altitude: e.target.value })}
+                        placeholder="520"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Ingresa las coordenadas manualmente o sube un archivo GPX
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="gpx-file">Archivo GPX (Opcional)</Label>
+                  <Input
+                    id="gpx-file"
+                    type="file"
+                    accept=".gpx"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        if (file.name.endsWith('.gpx')) {
+                          setGpxFile(file)
+                          toast.info('Archivo GPX seleccionado. Se extraerán las coordenadas al crear el milestone.')
+                        } else {
+                          toast.error('Por favor selecciona un archivo GPX válido')
+                        }
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Sube un archivo GPX para extraer coordenadas automáticamente. Si el GPX tiene múltiples waypoints, se usará el primero.
+                  </p>
+                  {gpxFile && (
+                    <div className="p-2 bg-muted rounded text-xs">
+                      <span className="font-medium">Archivo seleccionado:</span> {gpxFile.name}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

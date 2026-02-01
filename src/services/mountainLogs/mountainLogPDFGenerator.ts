@@ -63,6 +63,16 @@ export async function generateMountainLogPDF(
   pdf.text('BITÁCORA DE MONTAÑISMO', pageWidth / 2, yPosition, { align: 'center' })
   yPosition += 15
 
+  // Leyenda para bitácoras históricas
+  if (log.isHistorical) {
+    pdf.setFontSize(12)
+    pdf.setFont('helvetica', 'italic')
+    pdf.setTextColor(100, 100, 100) // Gris
+    pdf.text('BITÁCORA HISTÓRICA', pageWidth / 2, yPosition, { align: 'center' })
+    pdf.setTextColor(0, 0, 0) // Volver a negro
+    yPosition += 8
+  }
+
   pdf.setFontSize(18)
   pdf.setFont('helvetica', 'normal')
   pdf.text(log.title || 'Sin título', pageWidth / 2, yPosition, { align: 'center' })
@@ -319,18 +329,63 @@ export async function generateMountainLogPDF(
       pdf.text(`${i + 1}. ${typeText}: ${milestone.title}`, margin, yPosition)
       yPosition += 6
 
-      // Timestamp
+      // Timestamp - mostrar fechas/horas manuales si están disponibles (bitácoras históricas)
       pdf.setFontSize(9)
       pdf.setFont('helvetica', 'italic')
-      const milestoneDate = new Date(milestone.timestamp).toLocaleString('es-ES', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-      pdf.text(`Fecha: ${milestoneDate}`, margin, yPosition)
-      yPosition += 5
+      if (milestone.metadata?.fechaInicio || milestone.metadata?.horaInicio) {
+        // Mostrar fecha/hora manual para históricas
+        const fechaInicio = milestone.metadata.fechaInicio
+        const horaInicio = milestone.metadata.horaInicio
+        if (fechaInicio) {
+          const fechaFormateada = new Date(fechaInicio).toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })
+          const horaTexto = horaInicio ? ` ${horaInicio}` : ''
+          pdf.text(`Fecha de Inicio: ${fechaFormateada}${horaTexto}`, margin, yPosition)
+          yPosition += 4
+        }
+        if (milestone.metadata.fechaLlegada || milestone.metadata.horaLlegada) {
+          const fechaLlegada = milestone.metadata.fechaLlegada
+          const horaLlegada = milestone.metadata.horaLlegada
+          if (fechaLlegada) {
+            const fechaFormateada = new Date(fechaLlegada).toLocaleDateString('es-ES', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })
+            const horaTexto = horaLlegada ? ` ${horaLlegada}` : ''
+            pdf.text(`Fecha de Llegada: ${fechaFormateada}${horaTexto}`, margin, yPosition)
+            yPosition += 4
+          }
+        }
+        if (milestone.metadata.fechaSalida || milestone.metadata.horaSalida) {
+          const fechaSalida = milestone.metadata.fechaSalida
+          const horaSalida = milestone.metadata.horaSalida
+          if (fechaSalida) {
+            const fechaFormateada = new Date(fechaSalida).toLocaleDateString('es-ES', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })
+            const horaTexto = horaSalida ? ` ${horaSalida}` : ''
+            pdf.text(`Fecha de Salida: ${fechaFormateada}${horaTexto}`, margin, yPosition)
+            yPosition += 4
+          }
+        }
+      } else {
+        // Mostrar timestamp automático para bitácoras activas
+        const milestoneDate = new Date(milestone.timestamp).toLocaleString('es-ES', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+        pdf.text(`Fecha: ${milestoneDate}`, margin, yPosition)
+        yPosition += 5
+      }
 
       // GPS
       if (milestone.gpsPoint) {
@@ -361,7 +416,7 @@ export async function generateMountainLogPDF(
         yPosition += descLines.length * 5 + 3
       }
 
-      // Metadata adicional
+      // Metadata adicional (excluyendo fechas/horas que ya se mostraron arriba)
       if (milestone.metadata) {
         const metaInfo: string[] = []
         if (milestone.metadata.elevation) {
